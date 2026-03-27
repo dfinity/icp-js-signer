@@ -1,0 +1,82 @@
+{
+  "name": "@icp-sdk/signer",
+  "version": "5.2.0",
+  "author": "Slide",
+  "license": "Apache-2.0",
+  "description": "Library to interact with signers on the Internet Computer",
+  "homepage": "https://github.com/slide-computer/signer-js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/slide-computer/signer-js.git"
+  },
+  "bugs": {
+    "url": "https://github.com/slide-computer/signer-js/issues"
+  },
+  "keywords": [
+    "internet computer",
+    "internet-computer",
+    "ic",
+    "dfinity",
+    "signer",
+    "wallet",
+    "actor",
+    "dfx",
+    "canister",
+    "candid",
+    "motoko",
+    "javascript",
+    "typescript",
+    "blockchain",
+    "crypto",
+    "distributed",
+    "api",
+    "sdk"
+  ],
+  "type": "module",
+  "types": "./lib/esm/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/esm/index.d.ts",
+      "import": "./lib/esm/index.js",
+      "default": "./lib/esm/index.js"
+    },
+    "./agent": {
+      "types": "./lib/esm/agent/index.d.ts",
+      "import": "./lib/esm/agent/index.js",
+      "default": "./lib/esm/agent/index.js"
+    },
+    "./web": {
+      "types": "./lib/esm/web/index.d.ts",
+      "import": "./lib/esm/web/index.js",
+      "default": "./lib/esm/web/index.js"
+    },
+    "./extension": {
+      "types": "./lib/esm/extension/index.d.ts",
+      "import": "./lib/esm/extension/index.js",
+      "default": "./lib/esm/extension/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.esm.json && npm run lint:package",
+    "test": "vitest run",
+    "test:e2e": "npm run build && npm run build:e2e && playwright test",
+    "build:e2e": "cd e2e/fixtures && esbuild relying-party.ts mock-wallet.ts mock-auth-provider.ts --bundle --format=iife --outdir=. --out-extension:.js=.bundle.js",
+    "codestyle:check": "biome check",
+    "codestyle:fix": "biome check --write",
+    "lint:package": "publint --strict"
+  },
+  "peerDependencies": {
+    "@icp-sdk/core": "^5"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.9",
+    "@playwright/test": "^1.58.2",
+    "@tsconfig/node22": "^22.0.5",
+    "@types/node": "^25.5.0",
+    "esbuild": "^0.27.4",
+    "publint": "^0.3.18",
+    "serve": "^14.2.6",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.1"
+  }
+}
