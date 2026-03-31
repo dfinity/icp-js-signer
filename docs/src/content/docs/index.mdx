@@ -1,0 +1,92 @@
+---
+title: ICP JS Signer
+next: false
+prev: false
+tableOfContents: false
+hero:
+  title: ICP JavaScript SDK <span class="dfn-text-gradient">Signer</span>
+  tagline: Library to interact with signers on the Internet Computer
+  image:
+    file: ../../../../assets/icp.svg
+    alt: Internet Computer Logo
+head:
+  - tag: style
+    content: |
+      .sl-container {
+        max-width: 70rem;
+      }
+---
+
+import { Card, CardGrid, LinkButton } from '@astrojs/starlight/components';
+
+### Get Started
+
+<CardGrid>
+  <Card title="Installation">
+    <LinkButton
+      href="/signer/latest/installation"
+      variant="minimal"
+      icon="right-caret"
+      iconPlacement="start"
+    >
+      Install the <code class="dfn-text-highlight">@icp-sdk/signer</code> package
+    </LinkButton>
+  </Card>
+</CardGrid>
+
+### Modules
+
+<CardGrid>
+    <Card title="Signer">
+        Core signer functionality for managing permissions and signing requests.
+        <br />
+        <LinkButton
+            href="/signer/latest/api/index"
+            variant="minimal"
+            icon="right-caret"
+            iconPlacement="start"
+        >
+            See <code class="dfn-text-highlight">@icp-sdk/signer</code> docs
+        </LinkButton>
+    </Card>
+
+    <Card title="Agent">
+        Agent integration for signing canister calls.
+        <br />
+        <LinkButton
+            href="/signer/latest/api/agent"
+            variant="minimal"
+            icon="right-caret"
+            iconPlacement="start"
+        >
+            See <code class="dfn-text-highlight">@icp-sdk/signer/agent</code> docs
+        </LinkButton>
+    </Card>
+
+    <Card title="Web">
+        PostMessage-based transport for web applications.
+        <br />
+        <LinkButton
+            href="/signer/latest/api/web"
+            variant="minimal"
+            icon="right-caret"
+            iconPlacement="start"
+        >
+            See <code class="dfn-text-highlight">@icp-sdk/signer/web</code> docs
+        </LinkButton>
+    </Card>
+
+    <Card title="Extension">
+        Browser extension transport for signer communication.
+        <br />
+        <LinkButton
+            href="/signer/latest/api/extension"
+            variant="minimal"
+            icon="right-caret"
+            iconPlacement="start"
+        >
+            See <code class="dfn-text-highlight">@icp-sdk/signer/extension</code> docs
+        </LinkButton>
+    </Card>
+
+</CardGrid>

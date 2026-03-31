@@ -1,0 +1,50 @@
+[
+  {
+    "label": "Getting Started",
+    "items": [
+      { "label": "Overview", "link": "/" },
+      { "label": "Installation", "link": "/installation" }
+    ]
+  },
+  {
+    "label": "Modules",
+    "items": [
+      {
+        "label": "Signer",
+        "collapsed": true,
+        "autogenerate": {
+          "collapsed": true,
+          "directory": "api/index/"
+        }
+      },
+      {
+        "label": "Agent",
+        "collapsed": true,
+        "autogenerate": {
+          "collapsed": true,
+          "directory": "api/agent/"
+        }
+      },
+      {
+        "label": "Web",
+        "collapsed": true,
+        "autogenerate": {
+          "collapsed": true,
+          "directory": "api/web/"
+        }
+      },
+      {
+        "label": "Extension",
+        "collapsed": true,
+        "autogenerate": {
+          "collapsed": true,
+          "directory": "api/extension/"
+        }
+      }
+    ]
+  },
+  {
+    "label": "Changelog",
+    "link": "/changelog"
+  }
+]

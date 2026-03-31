@@ -9,7 +9,7 @@ import type { ProviderDetail } from './types.js';
 export class BrowserExtensionTransportError extends Error {}
 
 /** Options for creating a {@link BrowserExtensionTransport}. */
-export interface BrowserExtensionTransportOptions extends BrowserExtensionChannelOptions {}
+export type BrowserExtensionTransportOptions = BrowserExtensionChannelOptions;
 
 /** Options for {@link BrowserExtensionTransport.discover}. */
 export interface DiscoverBrowserExtensionOptions {

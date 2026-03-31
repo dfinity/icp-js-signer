@@ -1,16 +1,16 @@
 {
   "name": "@icp-sdk/signer",
   "version": "5.2.0",
-  "author": "Slide",
+  "author": "DFINITY Stiftung <sdk@dfinity.org>",
   "license": "Apache-2.0",
   "description": "Library to interact with signers on the Internet Computer",
-  "homepage": "https://github.com/slide-computer/signer-js",
+  "homepage": "https://js.icp.build/signer/",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/slide-computer/signer-js.git"
+    "url": "git+https://github.com/dfinity/icp-js-signer.git"
   },
   "bugs": {
-    "url": "https://github.com/slide-computer/signer-js/issues"
+    "url": "https://github.com/dfinity/icp-js-signer/issues"
   },
   "keywords": [
     "internet computer",
@@ -60,26 +60,62 @@
     "build": "tsc -p tsconfig.esm.json && npm run lint:package",
     "test": "vitest run",
     "test:e2e": "npm run build && npm run build:e2e && playwright test",
-    "build:e2e": "cd e2e/fixtures && esbuild relying-party.ts mock-wallet.ts mock-auth-provider.ts --bundle --format=iife --outdir=. --out-extension:.js=.bundle.js",
-    "codestyle:check": "prettier --check src/ && eslint src/",
-    "codestyle:fix": "prettier --write src/ && eslint --fix src/",
-    "lint:package": "publint --strict"
+    "build:e2e": "cd e2e/fixtures && esbuild relying-party.ts mock-wallet.ts mock-auth-provider.ts --bundle --format=iife --outdir=. --out-extension:.js=.bundle.js --alias:@icp-sdk/signer=../../lib/esm/index.js --alias:@icp-sdk/signer/web=../../lib/esm/web/index.js --alias:@icp-sdk/signer/extension=../../lib/esm/extension/index.js --alias:@icp-sdk/signer/agent=../../lib/esm/agent/index.js",
+    "lint": "eslint src/",
+    "lint:fix": "eslint --fix src/",
+    "lint:package": "publint --strict",
+    "attw": "attw --pack .",
+    "docs": "cd docs && npm run build",
+    "size": "size-limit --json",
+    "prettier:check": "npx -p prettier -p pretty-quick pretty-quick --check --branch main",
+    "prettier:format": "npx -p prettier -p pretty-quick pretty-quick --branch main",
+    "prepare": "husky"
   },
   "peerDependencies": {
     "@icp-sdk/core": "^5"
   },
+  "size-limit": [
+    {
+      "name": "@icp-sdk/signer",
+      "path": "./lib/esm/index.js",
+      "limit": "15 kb"
+    },
+    {
+      "name": "@icp-sdk/signer/agent",
+      "path": "./lib/esm/agent/index.js",
+      "limit": "15 kb"
+    },
+    {
+      "name": "@icp-sdk/signer/web",
+      "path": "./lib/esm/web/index.js",
+      "limit": "15 kb"
+    },
+    {
+      "name": "@icp-sdk/signer/extension",
+      "path": "./lib/esm/extension/index.js",
+      "limit": "15 kb"
+    }
+  ],
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.2",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.58.2",
+    "@size-limit/esbuild": "^12.0.1",
+    "@size-limit/preset-small-lib": "^12.0.1",
     "@tsconfig/node22": "^22.0.5",
     "@types/node": "^25.5.0",
     "@typescript-eslint/eslint-plugin": "^8.58.0",
     "@typescript-eslint/parser": "^8.58.0",
     "esbuild": "^0.27.4",
     "eslint": "^10.1.0",
+    "eslint-plugin-jsdoc": "^62.8.1",
+    "globals": "^17.4.0",
+    "husky": "^9.1.7",
     "prettier": "^3.8.1",
+    "pretty-quick": "^4.2.2",
     "publint": "^0.3.18",
     "serve": "^14.2.6",
+    "size-limit": "^12.0.1",
     "typescript": "^5.9.3",
     "vitest": "^4.1.1"
   }
