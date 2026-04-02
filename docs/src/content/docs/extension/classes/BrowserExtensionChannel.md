@@ -5,7 +5,7 @@ next: true
 prev: true
 ---
 
-Defined in: [src/extension/browserExtensionChannel.ts:30](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/extension/browserExtensionChannel.ts#L30)
+Defined in: [src/extension/browserExtensionChannel.ts:30](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/extension/browserExtensionChannel.ts#L30)
 
 A [Channel](../../index/interfaces/Channel.md) implementation that communicates with a browser
 extension signer via the ICRC-94 provider API.
@@ -25,7 +25,7 @@ The channel is automatically closed if the extension fires an
 
 > **new BrowserExtensionChannel**(`options`): `BrowserExtensionChannel`
 
-Defined in: [src/extension/browserExtensionChannel.ts:36](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/extension/browserExtensionChannel.ts#L36)
+Defined in: [src/extension/browserExtensionChannel.ts:36](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/extension/browserExtensionChannel.ts#L36)
 
 #### Parameters
 
@@ -45,7 +45,7 @@ Defined in: [src/extension/browserExtensionChannel.ts:36](https://github.com/dfi
 
 > **get** **closed**(): `boolean`
 
-Defined in: [src/extension/browserExtensionChannel.ts:52](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/extension/browserExtensionChannel.ts#L52)
+Defined in: [src/extension/browserExtensionChannel.ts:54](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/extension/browserExtensionChannel.ts#L54)
 
 Whether this channel has been closed.
 
@@ -63,7 +63,7 @@ Whether this channel has been closed.
 
 > **addEventListener**(...`__namedParameters`): () => `void`
 
-Defined in: [src/extension/browserExtensionChannel.ts:56](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/extension/browserExtensionChannel.ts#L56)
+Defined in: [src/extension/browserExtensionChannel.ts:58](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/extension/browserExtensionChannel.ts#L58)
 
 #### Parameters
 
@@ -85,7 +85,7 @@ Defined in: [src/extension/browserExtensionChannel.ts:56](https://github.com/dfi
 
 > **close**(): `Promise`\<`void`\>
 
-Defined in: [src/extension/browserExtensionChannel.ts:93](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/extension/browserExtensionChannel.ts#L93)
+Defined in: [src/extension/browserExtensionChannel.ts:98](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/extension/browserExtensionChannel.ts#L98)
 
 Dismisses the extension and notifies all close listeners.
 
@@ -103,7 +103,7 @@ Dismisses the extension and notifies all close listeners.
 
 > **send**(`request`): `Promise`\<`void`\>
 
-Defined in: [src/extension/browserExtensionChannel.ts:80](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/extension/browserExtensionChannel.ts#L80)
+Defined in: [src/extension/browserExtensionChannel.ts:83](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/extension/browserExtensionChannel.ts#L83)
 
 Sends a JSON-RPC request to the extension via `providerDetail.sendMessage`.
 The response is validated as JSON-RPC before being dispatched.
@@ -114,6 +114,8 @@ Non-JSON-RPC responses are silently ignored.
 ##### request
 
 `JsonRpcRequest`
+
+The JSON-RPC request to send to the extension.
 
 #### Returns
 

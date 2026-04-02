@@ -5,7 +5,7 @@ next: true
 prev: true
 ---
 
-Defined in: [src/transport.ts:24](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/transport.ts#L24)
+Defined in: [src/transport.ts:28](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/transport.ts#L28)
 
 ## Methods
 
@@ -13,7 +13,7 @@ Defined in: [src/transport.ts:24](https://github.com/dfinity/icp-js-signer/blob/
 
 > **establishChannel**(): `Promise`\<[`Channel`](Channel.md)\>
 
-Defined in: [src/transport.ts:25](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/transport.ts#L25)
+Defined in: [src/transport.ts:29](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/transport.ts#L29)
 
 #### Returns
 

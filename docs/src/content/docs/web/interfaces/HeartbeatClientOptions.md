@@ -5,7 +5,7 @@ next: true
 prev: true
 ---
 
-Defined in: [src/web/heartbeat/client.ts:3](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/web/heartbeat/client.ts#L3)
+Defined in: [src/web/heartbeat/client.ts:3](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/heartbeat/client.ts#L3)
 
 ## Properties
 
@@ -13,7 +13,7 @@ Defined in: [src/web/heartbeat/client.ts:3](https://github.com/dfinity/icp-js-si
 
 > `optional` **crypto?**: `Pick`\<`Crypto`, `"randomUUID"`\>
 
-Defined in: [src/web/heartbeat/client.ts:57](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/web/heartbeat/client.ts#L57)
+Defined in: [src/web/heartbeat/client.ts:57](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/heartbeat/client.ts#L57)
 
 Get random uuid implementation for status messages
 
@@ -29,7 +29,7 @@ globalThis.crypto;
 
 > `optional` **disconnectTimeout?**: `number`
 
-Defined in: [src/web/heartbeat/client.ts:38](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/web/heartbeat/client.ts#L38)
+Defined in: [src/web/heartbeat/client.ts:38](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/heartbeat/client.ts#L38)
 
 Time in milliseconds of not receiving heartbeat responses after which the communication channel is disconnected
 
@@ -45,7 +45,7 @@ Time in milliseconds of not receiving heartbeat responses after which the commun
 
 > `optional` **establishTimeout?**: `number`
 
-Defined in: [src/web/heartbeat/client.ts:16](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/web/heartbeat/client.ts#L16)
+Defined in: [src/web/heartbeat/client.ts:16](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/heartbeat/client.ts#L16)
 
 Reasonable time in milliseconds in which the communication channel needs to be established
 
@@ -61,9 +61,9 @@ Reasonable time in milliseconds in which the communication channel needs to be e
 
 > **onDisconnect**: () => `void`
 
-Defined in: [src/web/heartbeat/client.ts:42](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/web/heartbeat/client.ts#L42)
+Defined in: [src/web/heartbeat/client.ts:42](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/heartbeat/client.ts#L42)
 
-Callback when no heartbeats have been received for [disconnectTimeout](#disconnecttimeout) milliseconds
+Callback when no heartbeats have been received for `disconnectTimeout` milliseconds
 
 #### Returns
 
@@ -75,7 +75,7 @@ Callback when no heartbeats have been received for [disconnectTimeout](#disconne
 
 > **onEstablish**: (`origin`, `status`) => `void`
 
-Defined in: [src/web/heartbeat/client.ts:11](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/web/heartbeat/client.ts#L11)
+Defined in: [src/web/heartbeat/client.ts:11](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/heartbeat/client.ts#L11)
 
 Callback when first heartbeat has been received
 
@@ -99,9 +99,9 @@ Callback when first heartbeat has been received
 
 > **onEstablishTimeout**: () => `void`
 
-Defined in: [src/web/heartbeat/client.ts:20](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/web/heartbeat/client.ts#L20)
+Defined in: [src/web/heartbeat/client.ts:20](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/heartbeat/client.ts#L20)
 
-Callback when no heartbeats have been received for [establishTimeout](#establishtimeout) milliseconds
+Callback when no heartbeats have been received for `establishTimeout` milliseconds
 
 #### Returns
 
@@ -113,9 +113,9 @@ Callback when no heartbeats have been received for [establishTimeout](#establish
 
 > **onPendingTimeout**: () => `void`
 
-Defined in: [src/web/heartbeat/client.ts:33](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/web/heartbeat/client.ts#L33)
+Defined in: [src/web/heartbeat/client.ts:33](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/heartbeat/client.ts#L33)
 
-Callback when no heartbeats have been received for [pendingTimeout](#pendingtimeout) milliseconds
+Callback when no heartbeats have been received for `pendingTimeout` milliseconds
 
 #### Returns
 
@@ -127,7 +127,7 @@ Callback when no heartbeats have been received for [pendingTimeout](#pendingtime
 
 > **onStatusChange**: (`status`) => `void`
 
-Defined in: [src/web/heartbeat/client.ts:24](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/web/heartbeat/client.ts#L24)
+Defined in: [src/web/heartbeat/client.ts:24](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/heartbeat/client.ts#L24)
 
 Callback when status response has changed
 
@@ -147,7 +147,7 @@ Callback when status response has changed
 
 > `optional` **pendingTimeout?**: `number`
 
-Defined in: [src/web/heartbeat/client.ts:29](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/web/heartbeat/client.ts#L29)
+Defined in: [src/web/heartbeat/client.ts:29](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/heartbeat/client.ts#L29)
 
 Reasonable time in milliseconds in which the communication channel can be pending
 
@@ -163,7 +163,7 @@ Reasonable time in milliseconds in which the communication channel can be pendin
 
 > **signerWindow**: `Window`
 
-Defined in: [src/web/heartbeat/client.ts:7](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/web/heartbeat/client.ts#L7)
+Defined in: [src/web/heartbeat/client.ts:7](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/heartbeat/client.ts#L7)
 
 Signer window to send and receive heartbeat messages from
 
@@ -173,7 +173,7 @@ Signer window to send and receive heartbeat messages from
 
 > `optional` **statusPollingRate?**: `number`
 
-Defined in: [src/web/heartbeat/client.ts:47](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/web/heartbeat/client.ts#L47)
+Defined in: [src/web/heartbeat/client.ts:47](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/heartbeat/client.ts#L47)
 
 Status polling rate in ms
 
@@ -189,7 +189,7 @@ Status polling rate in ms
 
 > `optional` **window?**: `Window`
 
-Defined in: [src/web/heartbeat/client.ts:52](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/web/heartbeat/client.ts#L52)
+Defined in: [src/web/heartbeat/client.ts:52](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/heartbeat/client.ts#L52)
 
 Relying party window, used to listen for incoming message events
 

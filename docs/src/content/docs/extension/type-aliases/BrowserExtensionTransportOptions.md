@@ -7,6 +7,6 @@ prev: true
 
 > **BrowserExtensionTransportOptions** = [`BrowserExtensionChannelOptions`](../interfaces/BrowserExtensionChannelOptions.md)
 
-Defined in: [src/extension/browserExtensionTransport.ts:12](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/extension/browserExtensionTransport.ts#L12)
+Defined in: [src/extension/browserExtensionTransport.ts:12](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/extension/browserExtensionTransport.ts#L12)
 
 Options for creating a [BrowserExtensionTransport](../classes/BrowserExtensionTransport.md).

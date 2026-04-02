@@ -5,7 +5,7 @@ next: true
 prev: true
 ---
 
-Defined in: [src/signer.ts:82](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/signer.ts#L82)
+Defined in: [src/signer.ts:81](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/signer.ts#L81)
 
 Error thrown when a signer returns a JSON-RPC error response
 or when a transport-level failure occurs.
@@ -20,7 +20,7 @@ or when a transport-level failure occurs.
 
 > **new SignerError**(`error`, `options?`): `SignerError`
 
-Defined in: [src/signer.ts:88](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/signer.ts#L88)
+Defined in: [src/signer.ts:87](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/signer.ts#L87)
 
 #### Parameters
 
@@ -58,7 +58,7 @@ Defined in: docs/node_modules/typescript/lib/lib.es2022.error.d.ts:24
 
 > **code**: `number`
 
-Defined in: [src/signer.ts:84](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/signer.ts#L84)
+Defined in: [src/signer.ts:83](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/signer.ts#L83)
 
 The JSON-RPC error code.
 
@@ -68,7 +68,7 @@ The JSON-RPC error code.
 
 > `optional` **data?**: `unknown`
 
-Defined in: [src/signer.ts:86](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/signer.ts#L86)
+Defined in: [src/signer.ts:85](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/signer.ts#L85)
 
 Optional additional error data from the signer.
 

@@ -7,7 +7,7 @@ prev: true
 
 > **PermissionScope** = `object` & `Record`\<`string`, `unknown`\>
 
-Defined in: [src/signer.ts:57](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/signer.ts#L57)
+Defined in: [src/signer.ts:56](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/signer.ts#L56)
 
 A permission scope identifies a method and optionally additional
 constraints (e.g. target canister IDs for delegations).

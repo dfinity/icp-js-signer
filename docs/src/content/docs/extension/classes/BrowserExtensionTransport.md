@@ -5,13 +5,13 @@ next: true
 prev: true
 ---
 
-Defined in: [src/extension/browserExtensionTransport.ts:57](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/extension/browserExtensionTransport.ts#L57)
+Defined in: [src/extension/browserExtensionTransport.ts:55](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/extension/browserExtensionTransport.ts#L55)
 
 ICRC-94 transport for communicating with browser extension signers.
 
 Browser extensions announce themselves via `icrc94:announceProvider`
-window events. Use [discover](#discover) to find installed extensions, or
-[findTransport](#findtransport) to connect to a specific one by UUID.
+window events. Use [BrowserExtensionTransport.discover](#discover) to find installed extensions, or
+[BrowserExtensionTransport.findTransport](#findtransport) to connect to a specific one by UUID.
 
 ## See
 
@@ -38,7 +38,7 @@ const signer = new Signer({ transport });
 
 > **new BrowserExtensionTransport**(`options`): `BrowserExtensionTransport`
 
-Defined in: [src/extension/browserExtensionTransport.ts:60](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/extension/browserExtensionTransport.ts#L60)
+Defined in: [src/extension/browserExtensionTransport.ts:58](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/extension/browserExtensionTransport.ts#L58)
 
 #### Parameters
 
@@ -56,7 +56,7 @@ Defined in: [src/extension/browserExtensionTransport.ts:60](https://github.com/d
 
 > **establishChannel**(): `Promise`\<[`BrowserExtensionChannel`](BrowserExtensionChannel.md)\>
 
-Defined in: [src/extension/browserExtensionTransport.ts:110](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/extension/browserExtensionTransport.ts#L110)
+Defined in: [src/extension/browserExtensionTransport.ts:110](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/extension/browserExtensionTransport.ts#L110)
 
 Creates a new [BrowserExtensionChannel](BrowserExtensionChannel.md) for this extension.
 
@@ -72,9 +72,9 @@ Creates a new [BrowserExtensionChannel](BrowserExtensionChannel.md) for this ext
 
 ### discover()
 
-> `static` **discover**(`__namedParameters?`): `Promise`\<[`ProviderDetail`](../interfaces/ProviderDetail.md)[]\>
+> `static` **discover**(`root0?`): `Promise`\<[`ProviderDetail`](../interfaces/ProviderDetail.md)[]\>
 
-Defined in: [src/extension/browserExtensionTransport.ts:74](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/extension/browserExtensionTransport.ts#L74)
+Defined in: [src/extension/browserExtensionTransport.ts:74](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/extension/browserExtensionTransport.ts#L74)
 
 Discovers all installed browser extension signers by dispatching
 an `icrc94:requestProvider` event and collecting `icrc94:announceProvider`
@@ -82,9 +82,11 @@ responses. Waits for `discoveryDuration` ms before returning.
 
 #### Parameters
 
-##### \_\_namedParameters?
+##### root0?
 
 [`DiscoverBrowserExtensionOptions`](../interfaces/DiscoverBrowserExtensionOptions.md) = `{}`
+
+The discovery options.
 
 #### Returns
 
@@ -98,7 +100,7 @@ The discovered extension providers, deduplicated by UUID.
 
 > `static` **findTransport**(`options`): `Promise`\<`BrowserExtensionTransport`\>
 
-Defined in: [src/extension/browserExtensionTransport.ts:96](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/extension/browserExtensionTransport.ts#L96)
+Defined in: [src/extension/browserExtensionTransport.ts:96](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/extension/browserExtensionTransport.ts#L96)
 
 Discovers extensions and connects to the one matching the given UUID.
 
@@ -107,6 +109,8 @@ Discovers extensions and connects to the one matching the given UUID.
 ##### options
 
 [`EstablishBrowserExtensionTransportOptions`](../interfaces/EstablishBrowserExtensionTransportOptions.md)
+
+The options including UUID and discovery settings.
 
 #### Returns
 
