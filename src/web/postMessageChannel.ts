@@ -106,10 +106,14 @@ export class PostMessageChannel implements Channel {
       return Promise.resolve();
     }
 
-    this.#options.signerWindow.postMessage(request, this.#options.signerOrigin);
+    try {
+      this.#options.signerWindow.postMessage(request, this.#options.signerOrigin);
 
-    if (this.#options.manageFocus) {
-      this.#options.signerWindow.focus();
+      if (this.#options.manageFocus) {
+        this.#options.signerWindow.focus();
+      }
+    } catch (error) {
+      return Promise.reject(error);
     }
     return Promise.resolve();
   }

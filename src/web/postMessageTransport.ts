@@ -147,13 +147,23 @@ export class PostMessageTransport implements Transport {
         ),
       );
     }
-    const signerWindow = this.#options.window.open(
-      this.#options.url,
-      `${new URL(this.#options.url).origin}-signer-window`,
-      this.#options.windowOpenerFeatures,
-    );
-    if (!signerWindow) {
-      return Promise.reject(new PostMessageTransportError('Signer window could not be opened'));
+    let signerWindow: Window;
+    try {
+      const result = this.#options.window.open(
+        this.#options.url,
+        `${new URL(this.#options.url).origin}-signer-window`,
+        this.#options.windowOpenerFeatures,
+      );
+      if (!result) {
+        return Promise.reject(new PostMessageTransportError('Signer window could not be opened'));
+      }
+      signerWindow = result;
+    } catch (error) {
+      return Promise.reject(
+        new PostMessageTransportError(
+          error instanceof Error ? error.message : 'Signer window could not be opened',
+        ),
+      );
     }
 
     return new Promise<PostMessageChannel>((resolve, reject) => {

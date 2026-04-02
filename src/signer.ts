@@ -216,17 +216,19 @@ export class Signer<T extends Transport = Transport> {
       // normalize invalid ones so #rpc can trust the types
       if (
         'error' in response &&
-        (typeof response.error.code !== 'number' || typeof response.error.message !== 'string')
+        (typeof response.error !== 'object' ||
+          response.error === null ||
+          typeof response.error.code !== 'number' ||
+          typeof response.error.message !== 'string')
       ) {
         resolve({
           jsonrpc: '2.0',
           id: response.id,
           error: { code: GENERIC_ERROR, message: 'Invalid error response from signer' },
         });
-        return;
+      } else {
+        resolve(response);
       }
-
-      resolve(response);
 
       if (this.#options.autoCloseTransportChannel) {
         this.#scheduledChannelClosure = setTimeout(() => {
