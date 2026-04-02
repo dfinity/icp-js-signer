@@ -10,16 +10,17 @@ const PROVIDER: ProviderDetail = {
   name: 'Test Wallet',
   icon: 'data:image/svg+xml,test',
   rdns: 'com.test.wallet',
-  sendMessage: vi.fn(async () => undefined),
-  dismiss: vi.fn(async () => {}),
+  sendMessage: vi.fn(() => Promise.resolve(undefined)),
+  dismiss: vi.fn(() => Promise.resolve()),
 };
 
 const createMockWindow = () => {
   const listeners = new Map<string, Set<(event: any) => void>>();
   return {
     addEventListener: vi.fn((event: string, listener: (event: any) => void) => {
-      if (!listeners.has(event)) listeners.set(event, new Set());
-      listeners.get(event)!.add(listener);
+      const set = listeners.get(event) ?? new Set();
+      listeners.set(event, set);
+      set.add(listener);
     }),
     removeEventListener: vi.fn((event: string, listener: (event: any) => void) => {
       listeners.get(event)?.delete(listener);
@@ -69,8 +70,9 @@ describe('BrowserExtensionTransport', () => {
           const listeners = new Map<string, Set<(event: any) => void>>();
           (mockWindow.addEventListener as any).mock.calls.forEach(
             ([event, listener]: [string, (event: any) => void]) => {
-              if (!listeners.has(event)) listeners.set(event, new Set());
-              listeners.get(event)!.add(listener);
+              const set = listeners.get(event) ?? new Set();
+              listeners.set(event, set);
+              set.add(listener);
             },
           );
           listeners.get('icrc94:announceProvider')?.forEach(l => {

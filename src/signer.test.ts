@@ -27,15 +27,17 @@ const createMockChannel = (respondWith: (request: JsonRpcRequest) => JsonRpcResp
       }
       return () => {};
     },
-    async send(request: JsonRpcRequest) {
+    send(request: JsonRpcRequest): Promise<void> {
       // Simulate async signer response
       queueMicrotask(() => {
         responseListener?.(respondWith(request));
       });
+      return Promise.resolve();
     },
-    async close() {
+    close(): Promise<void> {
       this.closed = true;
       closeListeners.forEach(l => l());
+      return Promise.resolve();
     },
   };
 };
@@ -137,7 +139,7 @@ describe('Signer', () => {
     it('returns supported standards', async () => {
       const signer = createSigner(request => ({
         jsonrpc: '2.0',
-        id: request.id!,
+        id: request.id as string,
         result: {
           supportedStandards: [
             { name: 'ICRC-25', url: 'https://example.com' },
@@ -159,7 +161,7 @@ describe('Signer', () => {
     it('sends scopes and returns permission states', async () => {
       const signer = createSigner(request => ({
         jsonrpc: '2.0',
-        id: request.id!,
+        id: request.id as string,
         result: {
           scopes: [{ scope: { method: 'icrc27_accounts' }, state: 'granted' }],
         },
@@ -175,7 +177,7 @@ describe('Signer', () => {
     it('returns current permissions', async () => {
       const signer = createSigner(request => ({
         jsonrpc: '2.0',
-        id: request.id!,
+        id: request.id as string,
         result: {
           scopes: [{ scope: { method: 'icrc27_accounts' }, state: 'denied' }],
         },
@@ -192,7 +194,7 @@ describe('Signer', () => {
       const principal = Principal.fromText('sgymv-uiaaa-aaaaa-aaaia-cai');
       const signer = createSigner(request => ({
         jsonrpc: '2.0',
-        id: request.id!,
+        id: request.id as string,
         result: {
           accounts: [{ owner: principal.toText() }],
         },
@@ -208,7 +210,7 @@ describe('Signer', () => {
     it('decodes base64 subaccounts', async () => {
       const signer = createSigner(request => ({
         jsonrpc: '2.0',
-        id: request.id!,
+        id: request.id as string,
         result: {
           accounts: [
             {
@@ -222,7 +224,7 @@ describe('Signer', () => {
       const accounts = await signer.getAccounts();
 
       expect(accounts[0].subaccount).toBeInstanceOf(Uint8Array);
-      expect(accounts[0].subaccount![31]).toBe(1);
+      expect((accounts[0].subaccount as Uint8Array)[31]).toBe(1);
     });
   });
 
@@ -233,7 +235,7 @@ describe('Signer', () => {
 
       const signer = createSigner(request => ({
         jsonrpc: '2.0',
-        id: request.id!,
+        id: request.id as string,
         result: { contentMap, certificate },
       }));
 
@@ -253,7 +255,7 @@ describe('Signer', () => {
     it('throws SignerError on JSON-RPC error response', async () => {
       const signer = createSigner(request => ({
         jsonrpc: '2.0',
-        id: request.id!,
+        id: request.id as string,
         error: { code: 3000, message: 'Permission not granted' },
       }));
 
@@ -281,9 +283,10 @@ describe('Signer', () => {
               }
               return () => {};
             },
-            async send() {
+            send() {
               // Close the channel after send instead of responding
               queueMicrotask(() => closeListeners.forEach(l => l()));
+              return Promise.resolve();
             },
             async close() {},
           }),
@@ -305,8 +308,8 @@ describe('Signer', () => {
           Promise.resolve({
             closed: false,
             addEventListener: () => () => {},
-            async send() {
-              throw sendError;
+            send() {
+              return Promise.reject(sendError);
             },
             async close() {},
           }),
@@ -332,7 +335,7 @@ describe('Signer', () => {
               sentRequest = request;
               return {
                 jsonrpc: '2.0',
-                id: request.id!,
+                id: request.id as string,
                 result: { supportedStandards: [] },
               };
             }),
@@ -358,7 +361,7 @@ describe('Signer', () => {
               sentRequest = request;
               return {
                 jsonrpc: '2.0',
-                id: request.id!,
+                id: request.id as string,
                 result: { supportedStandards: [] },
               };
             }),

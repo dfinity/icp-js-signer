@@ -1,10 +1,14 @@
-export type JsonRpcError = { code: number; message: string; data?: unknown };
-export type JsonRpcRequest = {
+export interface JsonRpcError {
+  code: number;
+  message: string;
+  data?: unknown;
+}
+export interface JsonRpcRequest {
   jsonrpc: '2.0';
   id?: string | number | null;
   method: string;
   params?: Record<string, unknown>;
-};
+}
 export type JsonRpcResponse =
   | { jsonrpc: '2.0'; id: string | number | null; result: unknown }
   | { jsonrpc: '2.0'; id: string | number | null; error: JsonRpcError };

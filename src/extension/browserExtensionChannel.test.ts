@@ -7,8 +7,9 @@ const createMockWindow = () => {
   const listeners = new Map<string, Set<(event: any) => void>>();
   return {
     addEventListener: vi.fn((event: string, listener: (event: any) => void) => {
-      if (!listeners.has(event)) listeners.set(event, new Set());
-      listeners.get(event)!.add(listener);
+      const set = listeners.get(event) ?? new Set();
+      listeners.set(event, set);
+      set.add(listener);
     }),
     removeEventListener: vi.fn((event: string, listener: (event: any) => void) => {
       listeners.get(event)?.delete(listener);
@@ -24,8 +25,8 @@ const createMockProviderDetail = (overrides?: Partial<ProviderDetail>): Provider
   name: 'Test Extension',
   icon: 'data:image/svg+xml,test',
   rdns: 'com.test.extension',
-  sendMessage: vi.fn(async () => undefined),
-  dismiss: vi.fn(async () => {}),
+  sendMessage: vi.fn(() => Promise.resolve(undefined)),
+  dismiss: vi.fn(() => Promise.resolve()),
   ...overrides,
 });
 
@@ -56,11 +57,13 @@ describe('BrowserExtensionChannel', () => {
 
     it('dispatches JSON-RPC responses to listeners', async () => {
       const providerDetail = createMockProviderDetail({
-        sendMessage: vi.fn(async () => ({
-          jsonrpc: '2.0',
-          id: 1,
-          result: 'ok',
-        })),
+        sendMessage: vi.fn(() =>
+          Promise.resolve({
+            jsonrpc: '2.0',
+            id: 1,
+            result: 'ok',
+          }),
+        ),
       });
       const { channel } = createChannel({ providerDetail });
       const listener = vi.fn();
@@ -77,7 +80,7 @@ describe('BrowserExtensionChannel', () => {
 
     it('ignores non-JSON-RPC responses from sendMessage', async () => {
       const providerDetail = createMockProviderDetail({
-        sendMessage: vi.fn(async () => ({ some: 'random data' })),
+        sendMessage: vi.fn(() => Promise.resolve({ some: 'random data' })),
       });
       const { channel } = createChannel({ providerDetail });
       const listener = vi.fn();
@@ -131,11 +134,13 @@ describe('BrowserExtensionChannel', () => {
   describe('addEventListener', () => {
     it('unsubscribes response listener', async () => {
       const providerDetail = createMockProviderDetail({
-        sendMessage: vi.fn(async () => ({
-          jsonrpc: '2.0',
-          id: 1,
-          result: 'ok',
-        })),
+        sendMessage: vi.fn(() =>
+          Promise.resolve({
+            jsonrpc: '2.0',
+            id: 1,
+            result: 'ok',
+          }),
+        ),
       });
       const { channel } = createChannel({ providerDetail });
       const listener = vi.fn();

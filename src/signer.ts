@@ -51,7 +51,6 @@ const asArray = (value: unknown): unknown[] | undefined =>
 /**
  * A permission scope identifies a method and optionally additional
  * constraints (e.g. target canister IDs for delegations).
- *
  * @see https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_25_signer_interaction_standard.md
  */
 export type PermissionScope = { method: string } & Record<string, unknown>;
@@ -70,10 +69,10 @@ export type PermissionState = 'denied' | 'ask_on_use' | 'granted';
  * the ICRC standard identifier (e.g. `"ICRC-27"`) and `url` points
  * to the specification.
  */
-export type SupportedStandard = {
+export interface SupportedStandard {
   name: string;
   url: string;
-};
+}
 
 /**
  * Error thrown when a signer returns a JSON-RPC error response
@@ -115,7 +114,6 @@ export interface SignerOptions<T extends Transport> {
   /**
    * Derivation origin for ICRC-95 identity derivation.
    * When set, all requests include an `icrc95DerivationOrigin` param.
-   *
    * @see https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_95_derivationorigin.md
    */
   derivationOrigin?: string;
@@ -127,9 +125,7 @@ export interface SignerOptions<T extends Transport> {
  * Signers are applications that hold private keys and can sign messages
  * on behalf of a user. They communicate over a {@link Transport} using
  * JSON-RPC 2.0 messages as defined by the ICRC-25 standard.
- *
  * @see https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_25_signer_interaction_standard.md
- *
  * @example
  * ```ts
  * import { Signer } from "@icp-sdk/signer";
@@ -202,21 +198,24 @@ export class Signer<T extends Transport = Transport> {
   /**
    * Queries which ICRC standards the signer supports.
    * Use this to determine signer capabilities before calling other methods.
-   *
    * @see https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_25_signer_interaction_standard.md
    */
-  async getSupportedStandards(): Promise<SupportedStandard[]> {
+  getSupportedStandards(): Promise<SupportedStandard[]> {
     return this.#rpc({
       method: 'icrc25_supported_standards',
       decode: result => {
         const r = asRecord(result);
         const standards = asArray(r?.supportedStandards);
-        if (!standards) throw new Error('Expected supportedStandards array');
+        if (!standards) {
+          throw new Error('Expected supportedStandards array');
+        }
         return standards.map(item => {
           const obj = asRecord(item);
           const name = asString(obj?.name);
           const url = asString(obj?.url);
-          if (name === undefined || url === undefined) throw new Error('Expected { name, url }');
+          if (name === undefined || url === undefined) {
+            throw new Error('Expected { name, url }');
+          }
           return { name, url };
         });
       },
@@ -226,11 +225,10 @@ export class Signer<T extends Transport = Transport> {
   /**
    * Requests the signer to grant permission for the given scopes.
    * The signer may prompt the user for approval.
-   *
    * @param scopes - The permission scopes to request.
    * @returns The current state of each requested scope after the user's decision.
    */
-  async requestPermissions(
+  requestPermissions(
     scopes: PermissionScope[],
   ): Promise<Array<{ scope: PermissionScope; state: PermissionState }>> {
     return this.#rpc({
@@ -240,7 +238,9 @@ export class Signer<T extends Transport = Transport> {
       decode: result => {
         const r = asRecord(result);
         const scopes = asArray(r?.scopes);
-        if (!scopes) throw new Error('Expected scopes array');
+        if (!scopes) {
+          throw new Error('Expected scopes array');
+        }
         return scopes.map(item => {
           const obj = asRecord(item);
           const scope = asRecord(obj?.scope);
@@ -256,16 +256,17 @@ export class Signer<T extends Transport = Transport> {
 
   /**
    * Queries the current state of all permission scopes.
-   *
    * @returns The current permission state for each scope the signer supports.
    */
-  async getPermissions(): Promise<Array<{ scope: PermissionScope; state: PermissionState }>> {
+  getPermissions(): Promise<Array<{ scope: PermissionScope; state: PermissionState }>> {
     return this.#rpc({
       method: 'icrc25_permissions',
       decode: result => {
         const r = asRecord(result);
         const scopes = asArray(r?.scopes);
-        if (!scopes) throw new Error('Expected scopes array');
+        if (!scopes) {
+          throw new Error('Expected scopes array');
+        }
         return scopes.map(item => {
           const obj = asRecord(item);
           const scope = asRecord(obj?.scope);
@@ -284,21 +285,24 @@ export class Signer<T extends Transport = Transport> {
    * Each account has an owner {@link Principal} and an optional 32-byte subaccount.
    *
    * Requires the `icrc27_accounts` permission scope.
-   *
    * @see https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_27_accounts.md
    */
-  async getAccounts(): Promise<Array<{ owner: Principal; subaccount?: Uint8Array }>> {
+  getAccounts(): Promise<Array<{ owner: Principal; subaccount?: Uint8Array }>> {
     return this.#rpc({
       method: 'icrc27_accounts',
       decode: result => {
         const r = asRecord(result);
         const accounts = asArray(r?.accounts);
-        if (!accounts) throw new Error('Expected accounts array');
+        if (!accounts) {
+          throw new Error('Expected accounts array');
+        }
         return accounts.map(item => {
           const obj = asRecord(item);
           const owner = asString(obj?.owner);
           const subaccount = asString(obj?.subaccount);
-          if (!owner) throw new Error('Expected account.owner string');
+          if (!owner) {
+            throw new Error('Expected account.owner string');
+          }
           return {
             owner: Principal.fromText(owner),
             subaccount: subaccount !== undefined ? fromBase64(subaccount) : undefined,
@@ -312,17 +316,16 @@ export class Signer<T extends Transport = Transport> {
    * Requests a delegation chain from the signer for session-based authentication.
    * This allows the relying party to sign canister calls without requiring
    * user approval for each individual call.
-   *
+   * @param params - The delegation request parameters.
    * @param params.publicKey - The session's public key to delegate to.
    * @param params.targets - Optional canister IDs to restrict the delegation to.
    *   When provided, the signer creates an account delegation; otherwise a
    *   relying party delegation.
    * @param params.maxTimeToLive - Optional maximum delegation lifetime in nanoseconds.
    * @returns A {@link DelegationChain} that can be used with `DelegationIdentity`.
-   *
    * @see https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_34_delegation.md
    */
-  async requestDelegation(params: {
+  requestDelegation(params: {
     publicKey: PublicKey;
     targets?: Principal[];
     maxTimeToLive?: bigint;
@@ -372,7 +375,7 @@ export class Signer<T extends Transport = Transport> {
    * Requests the signer to execute a canister call on behalf of the user.
    * The signer will prompt the user for approval before signing and
    * submitting the call to the Internet Computer.
-   *
+   * @param params - The canister call parameters.
    * @param params.canisterId - The target canister.
    * @param params.sender - The principal executing the call.
    * @param params.method - The canister method to invoke.
@@ -380,10 +383,9 @@ export class Signer<T extends Transport = Transport> {
    * @param params.nonce - Optional nonce (max 32 bytes) for replay protection.
    * @returns The CBOR-encoded content map and certificate from the IC,
    *   which can be used to verify the call's execution.
-   *
    * @see https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_49_call_canister.md
    */
-  async callCanister(params: {
+  callCanister(params: {
     canisterId: Principal;
     sender: Principal;
     method: string;
@@ -416,6 +418,7 @@ export class Signer<T extends Transport = Transport> {
    * Sends a JSON-RPC request to the signer and decodes the result.
    * Handles encoding params, validating the response, and throwing
    * {@link SignerError} on JSON-RPC errors or invalid results.
+   * @param args - The RPC call configuration.
    */
   async #rpc<T, P = never>(
     args: { method: string; decode: (result: unknown) => T } & (
@@ -472,7 +475,10 @@ export class Signer<T extends Transport = Transport> {
     });
   }
 
-  /** Sends a JSON-RPC request over the transport channel. */
+  /**
+   * Sends a JSON-RPC request over the transport channel.
+   * @param request - The JSON-RPC request to send.
+   */
   async #sendRequest(request: JsonRpcRequest): Promise<JsonRpcResponse> {
     const channel = await this.openChannel();
 
@@ -508,7 +514,7 @@ export class Signer<T extends Transport = Transport> {
     });
 
     try {
-      await channel.send(await this.#transformRequest(request));
+      await channel.send(this.#transformRequest(request));
     } catch (error) {
       responseListener();
       closeListener();
@@ -529,10 +535,10 @@ export class Signer<T extends Transport = Transport> {
   /**
    * Appends the ICRC-95 derivation origin to the request params
    * when configured.
-   *
+   * @param request - The JSON-RPC request to transform.
    * @see https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_95_derivationorigin.md
    */
-  async #transformRequest(request: JsonRpcRequest): Promise<JsonRpcRequest> {
+  #transformRequest(request: JsonRpcRequest): JsonRpcRequest {
     if (this.#options.derivationOrigin) {
       return {
         ...request,

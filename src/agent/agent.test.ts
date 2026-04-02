@@ -74,14 +74,16 @@ const createMockSigner = (
   const mockChannel: Channel = {
     closed: false,
     addEventListener: () => () => {},
-    send: vi.fn(async () => {}),
-    close: vi.fn(async () => {}),
+    send: vi.fn(() => Promise.resolve()),
+    close: vi.fn(() => Promise.resolve()),
   };
 
   const signer = {
-    openChannel: vi.fn(async () => mockChannel),
-    closeChannel: vi.fn(async () => {}),
-    callCanister: vi.fn(async () => callCanisterResult),
+    openChannel: vi.fn(() => Promise.resolve(mockChannel)),
+    closeChannel: vi.fn(() => Promise.resolve()),
+    callCanister: vi.fn(
+      (): Promise<typeof callCanisterResult> => Promise.resolve(callCanisterResult),
+    ),
     supportedStandards: vi.fn(),
     accounts: vi.fn(),
     delegation: vi.fn(),
@@ -99,8 +101,8 @@ const createMockSigner = (
 const createMockHttpAgent = () =>
   ({
     rootKey: null,
-    fetchRootKey: vi.fn(async () => new Uint8Array()),
-    status: vi.fn(async () => ({})),
+    fetchRootKey: vi.fn(() => Promise.resolve(new Uint8Array())),
+    status: vi.fn(() => Promise.resolve({})),
   }) as any;
 
 const createAgent = async (signerOverrides?: Partial<Signer>) => {
@@ -292,7 +294,9 @@ describe('SignerAgent', () => {
       });
 
       expect(result.status).toBe('replied');
-      if (result.status !== 'replied') throw new Error('unexpected');
+      if (result.status !== 'replied') {
+        throw new Error('unexpected');
+      }
       expect(result.reply.arg).toEqual(REPLY);
     });
   });

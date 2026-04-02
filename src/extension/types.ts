@@ -3,7 +3,6 @@ import type { JsonRpcRequest } from '../transport.js';
 /**
  * Details about a browser extension signer, as announced via the
  * ICRC-94 `icrc94:announceProvider` event.
- *
  * @see https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_94_multi_injected_provider_discovery.md
  */
 export interface ProviderDetail {
