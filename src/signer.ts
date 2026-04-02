@@ -196,6 +196,78 @@ export class Signer<T extends Transport = Transport> {
   }
 
   /**
+   * Sends a JSON-RPC request over the transport channel.
+   * @param request - The JSON-RPC request to send.
+   */
+  async sendRequest(request: JsonRpcRequest): Promise<JsonRpcResponse> {
+    const channel = await this.openChannel();
+
+    const { promise, resolve, reject } = Promise.withResolvers<JsonRpcResponse>();
+
+    const responseListener = channel.addEventListener('response', response => {
+      if (response.id !== request.id) {
+        return;
+      }
+
+      responseListener();
+      closeListener();
+
+      // Validate that error responses have the expected shape,
+      // normalize invalid ones so #rpc can trust the types
+      if (
+        'error' in response &&
+        (typeof response.error.code !== 'number' || typeof response.error.message !== 'string')
+      ) {
+        resolve({
+          jsonrpc: '2.0',
+          id: response.id,
+          error: { code: GENERIC_ERROR, message: 'Invalid error response from signer' },
+        });
+        return;
+      }
+
+      resolve(response);
+
+      if (this.#options.autoCloseTransportChannel) {
+        this.#scheduledChannelClosure = setTimeout(() => {
+          if (!channel.closed) {
+            channel.close();
+          }
+        }, this.#options.closeTransportChannelAfter);
+      }
+    });
+
+    const closeListener = channel.addEventListener('close', () => {
+      responseListener();
+      closeListener();
+      reject(
+        new SignerError({
+          code: NETWORK_ERROR,
+          message: 'Channel was closed before a response was received',
+        }),
+      );
+    });
+
+    try {
+      await channel.send(this.#transformRequest(request));
+    } catch (error) {
+      responseListener();
+      closeListener();
+      reject(
+        new SignerError(
+          {
+            code: NETWORK_ERROR,
+            message: error instanceof Error ? error.message : 'Network error',
+          },
+          { cause: error },
+        ),
+      );
+    }
+
+    return promise;
+  }
+
+  /**
    * Queries which ICRC standards the signer supports.
    * Use this to determine signer capabilities before calling other methods.
    * @see https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_25_signer_interaction_standard.md
@@ -440,21 +512,14 @@ export class Signer<T extends Transport = Transport> {
         );
       }
     }
-    const response = await this.#sendRequest({
+    const response = await this.sendRequest({
       id: this.#options.crypto.randomUUID(),
       jsonrpc: '2.0',
       method: args.method,
       params,
     });
     if ('error' in response) {
-      const err = asRecord(response.error);
-      if (err && typeof err.code === 'number' && typeof err.message === 'string') {
-        throw new SignerError(err as JsonRpcError);
-      }
-      throw new SignerError({
-        code: GENERIC_ERROR,
-        message: 'Invalid error response from signer',
-      });
+      throw new SignerError(response.error);
     }
     if ('result' in response) {
       try {
@@ -473,63 +538,6 @@ export class Signer<T extends Transport = Transport> {
       code: GENERIC_ERROR,
       message: 'Response contains neither result nor error',
     });
-  }
-
-  /**
-   * Sends a JSON-RPC request over the transport channel.
-   * @param request - The JSON-RPC request to send.
-   */
-  async #sendRequest(request: JsonRpcRequest): Promise<JsonRpcResponse> {
-    const channel = await this.openChannel();
-
-    const { promise, resolve, reject } = Promise.withResolvers<JsonRpcResponse>();
-
-    const responseListener = channel.addEventListener('response', response => {
-      if (response.id !== request.id) {
-        return;
-      }
-
-      responseListener();
-      closeListener();
-      resolve(response);
-
-      if (this.#options.autoCloseTransportChannel) {
-        this.#scheduledChannelClosure = setTimeout(() => {
-          if (!channel.closed) {
-            channel.close();
-          }
-        }, this.#options.closeTransportChannelAfter);
-      }
-    });
-
-    const closeListener = channel.addEventListener('close', () => {
-      responseListener();
-      closeListener();
-      reject(
-        new SignerError({
-          code: NETWORK_ERROR,
-          message: 'Channel was closed before a response was received',
-        }),
-      );
-    });
-
-    try {
-      await channel.send(this.#transformRequest(request));
-    } catch (error) {
-      responseListener();
-      closeListener();
-      reject(
-        new SignerError(
-          {
-            code: NETWORK_ERROR,
-            message: error instanceof Error ? error.message : 'Network error',
-          },
-          { cause: error },
-        ),
-      );
-    }
-
-    return promise;
   }
 
   /**
