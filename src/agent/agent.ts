@@ -91,7 +91,6 @@ interface VerifiedCall {
  *
  * Use {@link SignerAgent.create} or {@link SignerAgent.createSync} to
  * construct an instance — the constructor is private.
- *
  * @example
  * ```ts
  * const agent = await SignerAgent.create({ signer, account });
@@ -126,6 +125,7 @@ export class SignerAgent<T extends Transport = Transport> implements Agent {
   /**
    * Creates a new SignerAgent, asynchronously initializing the
    * underlying HttpAgent if one is not provided.
+   * @param options - The signer agent options.
    */
   static async create<T extends Transport>(options: SignerAgentOptions<T>) {
     SignerAgent.#isInternalConstructing = true;
@@ -138,6 +138,7 @@ export class SignerAgent<T extends Transport = Transport> implements Agent {
   /**
    * Creates a new SignerAgent synchronously.
    * Use this when you already have an HttpAgent or don't need async initialization.
+   * @param options - The signer agent options.
    */
   static createSync<T extends Transport>(options: SignerAgentOptions<T>) {
     SignerAgent.#isInternalConstructing = true;
@@ -153,6 +154,8 @@ export class SignerAgent<T extends Transport = Transport> implements Agent {
    *
    * Calls are queued to ensure sequential execution — the signer's
    * transport channel is opened first to avoid blocking popups.
+   * @param canisterId - The target canister principal.
+   * @param fields - The call options including method name and arguments.
    */
   async #sendAndVerify(canisterId: Principal, fields: CallOptions): Promise<VerifiedCall> {
     await this.#options.signer.openChannel();
@@ -228,6 +231,8 @@ export class SignerAgent<T extends Transport = Transport> implements Agent {
   /**
    * Sends a canister call through the signer.
    * Returns the request ID and a synthetic HTTP response.
+   * @param canisterId - The target canister principal or its text representation.
+   * @param fields - The call options including method name and arguments.
    */
   async call(canisterId: Principal | string, fields: CallOptions): Promise<SubmitResponse> {
     canisterId = Principal.from(canisterId);
@@ -248,7 +253,8 @@ export class SignerAgent<T extends Transport = Transport> implements Agent {
   /**
    * Executes a canister update call and returns the certified result.
    * Combines {@link call} with certificate validation and reply extraction.
-   *
+   * @param canisterId - The target canister principal or its text representation.
+   * @param fields - The call options including method name and arguments.
    * @param _pollingOptions - Ignored. The signer already returns the
    *   certificate with the reply in a single round-trip.
    */
@@ -281,7 +287,8 @@ export class SignerAgent<T extends Transport = Transport> implements Agent {
    * Executes a query by upgrading it to a canister call through the signer.
    * The signer signs and submits the call, and the reply is extracted
    * from the certified response.
-   *
+   * @param canisterId - The target canister principal or its text representation.
+   * @param options - The query fields including method name and arguments.
    * @param _identity - Ignored. The signer manages identity internally.
    */
   async query(
@@ -310,17 +317,21 @@ export class SignerAgent<T extends Transport = Transport> implements Agent {
 
   /** Fetches the IC root key via the underlying HttpAgent. */
   async fetchRootKey(): Promise<Uint8Array> {
-    return this.#options.agent.fetchRootKey();
+    return await this.#options.agent.fetchRootKey();
   }
 
   /** Returns the account principal this agent makes calls on behalf of. */
-  async getPrincipal(): Promise<Principal> {
-    return this.#options.account;
+  getPrincipal(): Promise<Principal> {
+    return Promise.resolve(this.#options.account);
   }
 
-  /** @internal Required by the Agent interface but not used for signer calls. */
-  async createReadStateRequest(_options: ReadStateOptions, _identity?: Identity): Promise<unknown> {
-    return { body: { content: {} } };
+  /**
+   * @internal
+   * @param _options - The read state options.
+   * @param _identity - The identity to use for the request.
+   */
+  createReadStateRequest(_options: ReadStateOptions, _identity?: Identity): Promise<unknown> {
+    return Promise.resolve({ body: { content: {} } });
   }
 
   /**
@@ -329,8 +340,12 @@ export class SignerAgent<T extends Transport = Transport> implements Agent {
    *
    * Only supports `request_status` paths for request IDs that were
    * returned by a prior {@link call}, {@link update}, or {@link query}.
+   * @param _canisterId - The target canister principal (unused).
+   * @param options - The read state options containing paths to look up.
+   * @param _identity - The identity to use (unused).
+   * @param _request - The request object (unused).
    */
-  async readState(
+  readState(
     _canisterId: Principal | string,
     options: ReadStateOptions,
     _identity?: Identity | Promise<Identity>,
@@ -341,24 +356,27 @@ export class SignerAgent<T extends Transport = Transport> implements Agent {
       options.paths[0].length !== 2 ||
       new TextDecoder().decode(options.paths[0][0]) !== 'request_status'
     ) {
-      throw new SignerAgentError('Given paths are not supported');
+      return Promise.reject(new SignerAgentError('Given paths are not supported'));
     }
     const requestId = options.paths[0][1] as RequestId;
     const key = toHex(requestId);
     const certificate = this.#certificates.get(key);
     if (!certificate) {
-      throw new SignerAgentError('Certificate could not be found');
+      return Promise.reject(new SignerAgentError('Certificate could not be found'));
     }
     this.#certificates.delete(key);
-    return { certificate };
+    return Promise.resolve({ certificate });
   }
 
   /** Queries the IC replica status via the underlying HttpAgent. */
   async status(): Promise<JsonObject> {
-    return this.#options.agent.status();
+    return await this.#options.agent.status();
   }
 
-  /** Replaces the account principal used for subsequent calls. */
+  /**
+   * Replaces the account principal used for subsequent calls.
+   * @param account - The new account principal to use for subsequent calls.
+   */
   replaceAccount(account: Principal) {
     this.#options.account = account;
   }

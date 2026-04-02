@@ -20,7 +20,7 @@ export interface HeartbeatServerOptions {
    */
   establishTimeout?: number;
   /**
-   * Callback when no heartbeats have been received for {@link establishTimeout} milliseconds
+   * Callback when no heartbeats have been received for `establishTimeout` milliseconds
    */
   onEstablishTimeout: () => void;
   /**
@@ -29,7 +29,7 @@ export interface HeartbeatServerOptions {
    */
   disconnectTimeout?: number;
   /**
-   * Callback when no heartbeats have been received for {@link disconnectTimeout} milliseconds
+   * Callback when no heartbeats have been received for `disconnectTimeout` milliseconds
    */
   onDisconnect: () => void;
   /**

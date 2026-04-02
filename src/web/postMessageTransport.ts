@@ -89,9 +89,7 @@ if (globalThis.window) {
  * Opens a window to the signer's URL and establishes a communication channel
  * using the ICRC-29 heartbeat protocol (`icrc29_status` polling). Messages
  * are exchanged via `window.postMessage`.
- *
  * @see https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_29_window_post_message_transport.md
- *
  * @example
  * ```ts
  * const transport = new PostMessageTransport({ url: "https://oisy.com/sign" });
@@ -137,24 +135,35 @@ export class PostMessageTransport implements Transport {
   /**
    * Opens the signer window and establishes a communication channel
    * via the ICRC-29 heartbeat handshake.
-   *
    * @throws {PostMessageTransportError} If called outside a click handler
    *   (when `detectNonClickEstablishment` is enabled), if the window
    *   cannot be opened, or if the handshake times out.
    */
-  async establishChannel(): Promise<PostMessageChannel> {
+  establishChannel(): Promise<PostMessageChannel> {
     if (this.#options.detectNonClickEstablishment && !withinClick) {
-      throw new PostMessageTransportError(
-        `Signer window should not be opened outside of click handler, see: ${NON_CLICK_ESTABLISHMENT_LINK}`,
+      return Promise.reject(
+        new PostMessageTransportError(
+          `Signer window should not be opened outside of click handler, see: ${NON_CLICK_ESTABLISHMENT_LINK}`,
+        ),
       );
     }
-    const signerWindow = this.#options.window.open(
-      this.#options.url,
-      `${new URL(this.#options.url).origin}-signer-window`,
-      this.#options.windowOpenerFeatures,
-    );
-    if (!signerWindow) {
-      throw new PostMessageTransportError('Signer window could not be opened');
+    let signerWindow: Window;
+    try {
+      const result = this.#options.window.open(
+        this.#options.url,
+        `${new URL(this.#options.url).origin}-signer-window`,
+        this.#options.windowOpenerFeatures,
+      );
+      if (!result) {
+        return Promise.reject(new PostMessageTransportError('Signer window could not be opened'));
+      }
+      signerWindow = result;
+    } catch (error) {
+      return Promise.reject(
+        new PostMessageTransportError(
+          error instanceof Error ? error.message : 'Signer window could not be opened',
+        ),
+      );
     }
 
     return new Promise<PostMessageChannel>((resolve, reject) => {
@@ -166,7 +175,7 @@ export class PostMessageTransport implements Transport {
           channel = new PostMessageChannel({
             ...this.#options,
             signerOrigin: origin,
-            signerWindow: signerWindow,
+            signerWindow,
             signerStatus: status,
           });
           resolve(channel);

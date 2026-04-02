@@ -5,7 +5,7 @@ next: true
 prev: true
 ---
 
-Defined in: [src/agent/agent.ts:74](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/agent/agent.ts#L74)
+Defined in: [src/agent/agent.ts:74](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/agent/agent.ts#L74)
 
 Error thrown by [SignerAgent](SignerAgent.md) when a signer returns an invalid
 response or certificate validation fails.

@@ -5,7 +5,7 @@ next: true
 prev: true
 ---
 
-Defined in: [src/extension/types.ts:9](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/extension/types.ts#L9)
+Defined in: [src/extension/types.ts:8](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/extension/types.ts#L8)
 
 Details about a browser extension signer, as announced via the
 ICRC-94 `icrc94:announceProvider` event.
@@ -20,7 +20,7 @@ https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_94_m
 
 > **dismiss**: () => `Promise`\<`void`\>
 
-Defined in: [src/extension/types.ts:21](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/extension/types.ts#L21)
+Defined in: [src/extension/types.ts:20](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/extension/types.ts#L20)
 
 Dismisses the extension's UI.
 
@@ -34,7 +34,7 @@ Dismisses the extension's UI.
 
 > **icon**: `` `data:image/${string}` ``
 
-Defined in: [src/extension/types.ts:15](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/extension/types.ts#L15)
+Defined in: [src/extension/types.ts:14](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/extension/types.ts#L14)
 
 Icon as a data URI (e.g. `data:image/svg+xml,...`).
 
@@ -44,7 +44,7 @@ Icon as a data URI (e.g. `data:image/svg+xml,...`).
 
 > **name**: `string`
 
-Defined in: [src/extension/types.ts:13](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/extension/types.ts#L13)
+Defined in: [src/extension/types.ts:12](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/extension/types.ts#L12)
 
 Human-readable name of the signer.
 
@@ -54,7 +54,7 @@ Human-readable name of the signer.
 
 > **rdns**: `string`
 
-Defined in: [src/extension/types.ts:17](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/extension/types.ts#L17)
+Defined in: [src/extension/types.ts:16](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/extension/types.ts#L16)
 
 Reverse domain name identifier (e.g. `com.example.wallet`).
 
@@ -64,7 +64,7 @@ Reverse domain name identifier (e.g. `com.example.wallet`).
 
 > **sendMessage**: (`message`) => `Promise`\<`unknown`\>
 
-Defined in: [src/extension/types.ts:19](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/extension/types.ts#L19)
+Defined in: [src/extension/types.ts:18](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/extension/types.ts#L18)
 
 Sends a JSON-RPC request to the extension and returns the response.
 
@@ -84,6 +84,6 @@ Sends a JSON-RPC request to the extension and returns the response.
 
 > **uuid**: `string`
 
-Defined in: [src/extension/types.ts:11](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/extension/types.ts#L11)
+Defined in: [src/extension/types.ts:10](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/extension/types.ts#L10)
 
 Globally unique identifier (UUIDv4) for this extension.

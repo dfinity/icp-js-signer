@@ -14,8 +14,9 @@ const createMockWindow = () => {
   const listeners = new Map<string, Set<(event: any) => void>>();
   return {
     addEventListener: (event: string, listener: (event: any) => void) => {
-      if (!listeners.has(event)) listeners.set(event, new Set());
-      listeners.get(event)!.add(listener);
+      const set = listeners.get(event) ?? new Set();
+      listeners.set(event, set);
+      set.add(listener);
     },
     removeEventListener: (event: string, listener: (event: any) => void) => {
       listeners.get(event)?.delete(listener);

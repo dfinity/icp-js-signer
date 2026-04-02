@@ -4,7 +4,7 @@ import {
   type JsonRpcResponse,
   isJsonRpcResponse,
 } from '../transport.js';
-import { PostMessageTransportError } from './postMessageTransport.js';
+import { type PostMessageTransport, PostMessageTransportError } from './postMessageTransport.js';
 
 /** Options for creating a {@link PostMessageChannel}. */
 export interface PostMessageChannelOptions {
@@ -71,7 +71,7 @@ export class PostMessageChannel implements Channel {
           this.#closeListeners.delete(listener);
         };
       case 'response': {
-        const messageListener = async (event: MessageEvent) => {
+        const messageListener = (event: MessageEvent) => {
           // Only accept messages from the signer's window and origin
           if (
             event.source !== this.#options.signerWindow ||
@@ -94,28 +94,34 @@ export class PostMessageChannel implements Channel {
    * Sends a JSON-RPC request to the signer. If the signer status is
    * `"pending"`, the request is queued until {@link changeStatus} is
    * called with `"ready"`.
+   * @param request - The JSON-RPC request to send.
    */
-  async send(request: JsonRpcRequest): Promise<void> {
+  send(request: JsonRpcRequest): Promise<void> {
     if (this.#closed) {
-      throw new PostMessageTransportError('Communication channel is closed');
+      return Promise.reject(new PostMessageTransportError('Communication channel is closed'));
     }
 
     if (this.#options.signerStatus === 'pending') {
       this.#pendingQueue.push(request);
-      return;
+      return Promise.resolve();
     }
 
-    this.#options.signerWindow.postMessage(request, this.#options.signerOrigin);
+    try {
+      this.#options.signerWindow.postMessage(request, this.#options.signerOrigin);
 
-    if (this.#options.manageFocus) {
-      this.#options.signerWindow.focus();
+      if (this.#options.manageFocus) {
+        this.#options.signerWindow.focus();
+      }
+    } catch (error) {
+      return Promise.reject(error);
     }
+    return Promise.resolve();
   }
 
   /** Closes the signer window and notifies all close listeners. */
-  async close(): Promise<void> {
+  close(): Promise<void> {
     if (this.#closed) {
-      return;
+      return Promise.resolve();
     }
 
     this.#closed = true;
@@ -125,12 +131,16 @@ export class PostMessageChannel implements Channel {
       this.#options.window.focus();
     }
 
-    for (const listener of this.#closeListeners) listener();
+    for (const listener of this.#closeListeners) {
+      listener();
+    }
+    return Promise.resolve();
   }
 
   /**
    * Updates the signer status. When transitioning to `"ready"`,
    * all queued messages are flushed to the signer window.
+   * @param status - The new signer status.
    */
   changeStatus(status: 'pending' | 'ready') {
     this.#options.signerStatus = status;

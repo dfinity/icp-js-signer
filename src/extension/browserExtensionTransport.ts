@@ -39,11 +39,9 @@ export interface EstablishBrowserExtensionTransportOptions
  * ICRC-94 transport for communicating with browser extension signers.
  *
  * Browser extensions announce themselves via `icrc94:announceProvider`
- * window events. Use {@link discover} to find installed extensions, or
- * {@link findTransport} to connect to a specific one by UUID.
- *
+ * window events. Use {@link BrowserExtensionTransport.discover} to find installed extensions, or
+ * {@link BrowserExtensionTransport.findTransport} to connect to a specific one by UUID.
  * @see https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_94_multi_injected_provider_discovery.md
- *
  * @example
  * ```ts
  * // Discover all installed extensions
@@ -68,7 +66,9 @@ export class BrowserExtensionTransport implements Transport {
    * Discovers all installed browser extension signers by dispatching
    * an `icrc94:requestProvider` event and collecting `icrc94:announceProvider`
    * responses. Waits for `discoveryDuration` ms before returning.
-   *
+   * @param root0 - The discovery options.
+   * @param root0.discoveryDuration - Time in milliseconds to wait for announcements.
+   * @param root0.window - The window to listen for extension events on.
    * @returns The discovered extension providers, deduplicated by UUID.
    */
   static async discover({
@@ -89,7 +89,7 @@ export class BrowserExtensionTransport implements Transport {
 
   /**
    * Discovers extensions and connects to the one matching the given UUID.
-   *
+   * @param options - The options including UUID and discovery settings.
    * @throws {BrowserExtensionTransportError} If no extension with the given
    *   UUID is found.
    */
@@ -107,7 +107,7 @@ export class BrowserExtensionTransport implements Transport {
   }
 
   /** Creates a new {@link BrowserExtensionChannel} for this extension. */
-  async establishChannel(): Promise<BrowserExtensionChannel> {
-    return new BrowserExtensionChannel(this.#options);
+  establishChannel(): Promise<BrowserExtensionChannel> {
+    return Promise.resolve(new BrowserExtensionChannel(this.#options));
   }
 }

@@ -43,7 +43,9 @@ export class BrowserExtensionChannel implements Channel {
     const closeListener = () => {
       this.#options.window.removeEventListener('icrc94:unexpectedlyClosed', closeListener);
       this.#closed = true;
-      for (const listener of this.#closeListeners) listener();
+      for (const listener of this.#closeListeners) {
+        listener();
+      }
     };
     this.#options.window.addEventListener('icrc94:unexpectedlyClosed', closeListener);
   }
@@ -76,6 +78,7 @@ export class BrowserExtensionChannel implements Channel {
    * Sends a JSON-RPC request to the extension via `providerDetail.sendMessage`.
    * The response is validated as JSON-RPC before being dispatched.
    * Non-JSON-RPC responses are silently ignored.
+   * @param request - The JSON-RPC request to send to the extension.
    */
   async send(request: JsonRpcRequest): Promise<void> {
     if (this.#closed) {
@@ -86,7 +89,9 @@ export class BrowserExtensionChannel implements Channel {
     if (!isJsonRpcResponse(response)) {
       return;
     }
-    for (const listener of this.#responseListeners) listener(response);
+    for (const listener of this.#responseListeners) {
+      listener(response);
+    }
   }
 
   /** Dismisses the extension and notifies all close listeners. */
@@ -96,6 +101,8 @@ export class BrowserExtensionChannel implements Channel {
     }
     this.#closed = true;
     await this.#options.providerDetail.dismiss();
-    for (const listener of this.#closeListeners) listener();
+    for (const listener of this.#closeListeners) {
+      listener();
+    }
   }
 }

@@ -5,7 +5,7 @@ next: true
 prev: true
 ---
 
-Defined in: [src/agent/agent.ts:101](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/agent/agent.ts#L101)
+Defined in: [src/agent/agent.ts:100](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/agent/agent.ts#L100)
 
 An Agent implementation that routes canister calls through a
 [Signer](../../index/classes/Signer.md) for user approval. Drop-in replacement for HttpAgent
@@ -46,7 +46,7 @@ const result = await agent.update(canisterId, {
 
 > **get** **rootKey**(): `Uint8Array`\<`ArrayBufferLike`\>
 
-Defined in: [src/agent/agent.ts:117](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/agent/agent.ts#L117)
+Defined in: [src/agent/agent.ts:116](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/agent/agent.ts#L116)
 
 The root key used for certificate verification.
 
@@ -66,7 +66,7 @@ The root key used for certificate verification.
 
 > **get** **signer**(): [`Signer`](../../index/classes/Signer.md)\<`T`\>
 
-Defined in: [src/agent/agent.ts:122](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/agent/agent.ts#L122)
+Defined in: [src/agent/agent.ts:121](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/agent/agent.ts#L121)
 
 The signer this agent routes calls through.
 
@@ -80,7 +80,7 @@ The signer this agent routes calls through.
 
 > **call**(`canisterId`, `fields`): `Promise`\<`SubmitResponse`\>
 
-Defined in: [src/agent/agent.ts:232](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/agent/agent.ts#L232)
+Defined in: [src/agent/agent.ts:237](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/agent/agent.ts#L237)
 
 Sends a canister call through the signer.
 Returns the request ID and a synthetic HTTP response.
@@ -91,9 +91,13 @@ Returns the request ID and a synthetic HTTP response.
 
 `string` \| `Principal`
 
+The target canister principal or its text representation.
+
 ##### fields
 
 `CallOptions`
+
+The call options including method name and arguments.
 
 #### Returns
 
@@ -109,11 +113,9 @@ Returns the request ID and a synthetic HTTP response.
 
 > **createReadStateRequest**(`_options`, `_identity?`): `Promise`\<`unknown`\>
 
-Defined in: [src/agent/agent.ts:322](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/agent/agent.ts#L322)
+Defined in: [src/agent/agent.ts:333](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/agent/agent.ts#L333)
 
 **`Internal`**
-
-Required by the Agent interface but not used for signer calls.
 
 #### Parameters
 
@@ -121,9 +123,13 @@ Required by the Agent interface but not used for signer calls.
 
 `ReadStateOptions`
 
+The read state options.
+
 ##### \_identity?
 
 `Identity`
+
+The identity to use for the request.
 
 #### Returns
 
@@ -139,7 +145,7 @@ Required by the Agent interface but not used for signer calls.
 
 > **fetchRootKey**(): `Promise`\<`Uint8Array`\<`ArrayBufferLike`\>\>
 
-Defined in: [src/agent/agent.ts:312](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/agent/agent.ts#L312)
+Defined in: [src/agent/agent.ts:319](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/agent/agent.ts#L319)
 
 Fetches the IC root key via the underlying HttpAgent.
 
@@ -157,7 +163,7 @@ Fetches the IC root key via the underlying HttpAgent.
 
 > **getPrincipal**(): `Promise`\<`Principal`\>
 
-Defined in: [src/agent/agent.ts:317](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/agent/agent.ts#L317)
+Defined in: [src/agent/agent.ts:324](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/agent/agent.ts#L324)
 
 Returns the account principal this agent makes calls on behalf of.
 
@@ -175,7 +181,7 @@ Returns the account principal this agent makes calls on behalf of.
 
 > **query**(`canisterId`, `options`, `_identity?`): `Promise`\<`ApiQueryResponse`\>
 
-Defined in: [src/agent/agent.ts:287](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/agent/agent.ts#L287)
+Defined in: [src/agent/agent.ts:294](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/agent/agent.ts#L294)
 
 Executes a query by upgrading it to a canister call through the signer.
 The signer signs and submits the call, and the reply is extracted
@@ -187,9 +193,13 @@ from the certified response.
 
 `string` \| `Principal`
 
+The target canister principal or its text representation.
+
 ##### options
 
 `QueryFields`
+
+The query fields including method name and arguments.
 
 ##### \_identity?
 
@@ -211,7 +221,7 @@ Ignored. The signer manages identity internally.
 
 > **readState**(`_canisterId`, `options`, `_identity?`, `_request?`): `Promise`\<`ReadStateResponse`\>
 
-Defined in: [src/agent/agent.ts:333](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/agent/agent.ts#L333)
+Defined in: [src/agent/agent.ts:348](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/agent/agent.ts#L348)
 
 Returns the raw certificate for a previously completed call.
 The certificate is deleted after being read (single-use).
@@ -225,17 +235,25 @@ returned by a prior [call](#call), [update](#update), or [query](#query).
 
 `string` \| `Principal`
 
+The target canister principal (unused).
+
 ##### options
 
 `ReadStateOptions`
+
+The read state options containing paths to look up.
 
 ##### \_identity?
 
 `Identity` \| `Promise`\<`Identity`\>
 
+The identity to use (unused).
+
 ##### \_request?
 
 `unknown`
+
+The request object (unused).
 
 #### Returns
 
@@ -251,7 +269,7 @@ returned by a prior [call](#call), [update](#update), or [query](#query).
 
 > **replaceAccount**(`account`): `void`
 
-Defined in: [src/agent/agent.ts:362](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/agent/agent.ts#L362)
+Defined in: [src/agent/agent.ts:380](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/agent/agent.ts#L380)
 
 Replaces the account principal used for subsequent calls.
 
@@ -260,6 +278,8 @@ Replaces the account principal used for subsequent calls.
 ##### account
 
 `Principal`
+
+The new account principal to use for subsequent calls.
 
 #### Returns
 
@@ -271,7 +291,7 @@ Replaces the account principal used for subsequent calls.
 
 > **status**(): `Promise`\<`JsonObject`\>
 
-Defined in: [src/agent/agent.ts:357](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/agent/agent.ts#L357)
+Defined in: [src/agent/agent.ts:372](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/agent/agent.ts#L372)
 
 Queries the IC replica status via the underlying HttpAgent.
 
@@ -289,7 +309,7 @@ Queries the IC replica status via the underlying HttpAgent.
 
 > **update**(`canisterId`, `fields`, `_pollingOptions?`): `Promise`\<`UpdateResult`\>
 
-Defined in: [src/agent/agent.ts:255](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/agent/agent.ts#L255)
+Defined in: [src/agent/agent.ts:261](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/agent/agent.ts#L261)
 
 Executes a canister update call and returns the certified result.
 Combines [call](#call) with certificate validation and reply extraction.
@@ -300,9 +320,13 @@ Combines [call](#call) with certificate validation and reply extraction.
 
 `string` \| `Principal`
 
+The target canister principal or its text representation.
+
 ##### fields
 
 `CallOptions`
+
+The call options including method name and arguments.
 
 ##### \_pollingOptions?
 
@@ -325,7 +349,7 @@ certificate with the reply in a single round-trip.
 
 > `static` **create**\<`T`\>(`options`): `Promise`\<`SignerAgent`\<`T`\>\>
 
-Defined in: [src/agent/agent.ts:130](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/agent/agent.ts#L130)
+Defined in: [src/agent/agent.ts:130](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/agent/agent.ts#L130)
 
 Creates a new SignerAgent, asynchronously initializing the
 underlying HttpAgent if one is not provided.
@@ -342,6 +366,8 @@ underlying HttpAgent if one is not provided.
 
 [`SignerAgentOptions`](../interfaces/SignerAgentOptions.md)\<`T`\>
 
+The signer agent options.
+
 #### Returns
 
 `Promise`\<`SignerAgent`\<`T`\>\>
@@ -352,7 +378,7 @@ underlying HttpAgent if one is not provided.
 
 > `static` **createSync**\<`T`\>(`options`): `SignerAgent`\<`T`\>
 
-Defined in: [src/agent/agent.ts:142](https://github.com/dfinity/icp-js-signer/blob/a5db4fd7878bef2468bd688a478dc0e666ff45e9/src/agent/agent.ts#L142)
+Defined in: [src/agent/agent.ts:143](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/agent/agent.ts#L143)
 
 Creates a new SignerAgent synchronously.
 Use this when you already have an HttpAgent or don't need async initialization.
@@ -368,6 +394,8 @@ Use this when you already have an HttpAgent or don't need async initialization.
 ##### options
 
 [`SignerAgentOptions`](../interfaces/SignerAgentOptions.md)\<`T`\>
+
+The signer agent options.
 
 #### Returns
 
