@@ -4,6 +4,7 @@ export {
   Signer,
   SignerError,
   type SignerOptions,
+  type SignerRequestTransformFn,
   type SupportedStandard,
 } from './signer.js';
 

@@ -5,7 +5,7 @@ next: true
 prev: true
 ---
 
-Defined in: [src/extension/browserExtensionTransport.ts:55](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/extension/browserExtensionTransport.ts#L55)
+Defined in: [src/extension/browserExtensionTransport.ts:55](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/extension/browserExtensionTransport.ts#L55)
 
 ICRC-94 transport for communicating with browser extension signers.
 
@@ -38,7 +38,7 @@ const signer = new Signer({ transport });
 
 > **new BrowserExtensionTransport**(`options`): `BrowserExtensionTransport`
 
-Defined in: [src/extension/browserExtensionTransport.ts:58](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/extension/browserExtensionTransport.ts#L58)
+Defined in: [src/extension/browserExtensionTransport.ts:58](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/extension/browserExtensionTransport.ts#L58)
 
 #### Parameters
 
@@ -56,7 +56,7 @@ Defined in: [src/extension/browserExtensionTransport.ts:58](https://github.com/d
 
 > **establishChannel**(): `Promise`\<[`BrowserExtensionChannel`](BrowserExtensionChannel.md)\>
 
-Defined in: [src/extension/browserExtensionTransport.ts:110](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/extension/browserExtensionTransport.ts#L110)
+Defined in: [src/extension/browserExtensionTransport.ts:110](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/extension/browserExtensionTransport.ts#L110)
 
 Creates a new [BrowserExtensionChannel](BrowserExtensionChannel.md) for this extension.
 
@@ -74,7 +74,7 @@ Creates a new [BrowserExtensionChannel](BrowserExtensionChannel.md) for this ext
 
 > `static` **discover**(`root0?`): `Promise`\<[`ProviderDetail`](../interfaces/ProviderDetail.md)[]\>
 
-Defined in: [src/extension/browserExtensionTransport.ts:74](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/extension/browserExtensionTransport.ts#L74)
+Defined in: [src/extension/browserExtensionTransport.ts:74](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/extension/browserExtensionTransport.ts#L74)
 
 Discovers all installed browser extension signers by dispatching
 an `icrc94:requestProvider` event and collecting `icrc94:announceProvider`
@@ -100,7 +100,7 @@ The discovered extension providers, deduplicated by UUID.
 
 > `static` **findTransport**(`options`): `Promise`\<`BrowserExtensionTransport`\>
 
-Defined in: [src/extension/browserExtensionTransport.ts:96](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/extension/browserExtensionTransport.ts#L96)
+Defined in: [src/extension/browserExtensionTransport.ts:96](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/extension/browserExtensionTransport.ts#L96)
 
 Discovers extensions and connects to the one matching the given UUID.
 

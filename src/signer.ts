@@ -49,6 +49,35 @@ const asArray = (value: unknown): unknown[] | undefined =>
   Array.isArray(value) ? value : undefined;
 
 /**
+ * A function that transforms a JSON-RPC request before it is sent to the signer.
+ * Transforms are applied in order and each receives the output of the previous one.
+ */
+export type SignerRequestTransformFn = (request: JsonRpcRequest) => JsonRpcRequest;
+
+/**
+ * Ensures a JSON-RPC request contains only valid JSON values.
+ * Properties with `undefined` values are stripped, and non-serializable
+ * values such as `BigInt` will cause an error.
+ * @param request - The JSON-RPC request to clean.
+ */
+const jsonCleanTransform: SignerRequestTransformFn = request => JSON.parse(JSON.stringify(request));
+
+/**
+ * Creates a transform that appends the ICRC-95 derivation origin to request params.
+ * @param derivationOrigin - The derivation origin URL to include.
+ * @see https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_95_derivationorigin.md
+ */
+const icrc95DerivationOriginTransform = (derivationOrigin: string): SignerRequestTransformFn => {
+  return request => ({
+    ...request,
+    params: {
+      ...request.params,
+      icrc95DerivationOrigin: derivationOrigin,
+    },
+  });
+};
+
+/**
  * A permission scope identifies a method and optionally additional
  * constraints (e.g. target canister IDs for delegations).
  * @see https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_25_signer_interaction_standard.md
@@ -112,6 +141,11 @@ export interface SignerOptions<T extends Transport> {
    */
   crypto?: Pick<Crypto, 'randomUUID'>;
   /**
+   * Additional transform functions applied to each outgoing JSON-RPC request.
+   * Transforms are applied in order; each receives the output of the previous one.
+   */
+  transforms?: SignerRequestTransformFn[];
+  /**
    * Derivation origin for ICRC-95 identity derivation.
    * When set, all requests include an `icrc95DerivationOrigin` param.
    * @see https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_95_derivationorigin.md
@@ -146,11 +180,18 @@ export class Signer<T extends Transport = Transport> {
   #scheduledChannelClosure?: ReturnType<typeof setTimeout>;
 
   constructor(options: SignerOptions<T>) {
+    const transforms: SignerRequestTransformFn[] = [...(options.transforms ?? [])];
+    if (options.derivationOrigin) {
+      transforms.push(icrc95DerivationOriginTransform(options.derivationOrigin));
+    }
+    transforms.push(jsonCleanTransform);
+
     this.#options = {
       autoCloseTransportChannel: true,
       closeTransportChannelAfter: 200,
       crypto: globalThis.crypto,
       ...options,
+      transforms,
     };
   }
 
@@ -250,8 +291,26 @@ export class Signer<T extends Transport = Transport> {
       );
     });
 
+    let transformedRequest: JsonRpcRequest;
     try {
-      await channel.send(this.#transformRequest(request));
+      transformedRequest = this.#applyTransforms(request);
+    } catch (cause) {
+      responseListener();
+      closeListener();
+      reject(
+        new SignerError(
+          {
+            code: GENERIC_ERROR,
+            message: `Transform failed: ${cause instanceof Error ? cause.message : cause}`,
+          },
+          { cause },
+        ),
+      );
+      return promise;
+    }
+
+    try {
+      await channel.send(transformedRequest);
     } catch (error) {
       responseListener();
       closeListener();
@@ -543,21 +602,10 @@ export class Signer<T extends Transport = Transport> {
   }
 
   /**
-   * Appends the ICRC-95 derivation origin to the request params
-   * when configured.
+   * Applies all configured transforms to a JSON-RPC request.
    * @param request - The JSON-RPC request to transform.
-   * @see https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_95_derivationorigin.md
    */
-  #transformRequest(request: JsonRpcRequest): JsonRpcRequest {
-    if (this.#options.derivationOrigin) {
-      return {
-        ...request,
-        params: {
-          ...request.params,
-          icrc95DerivationOrigin: this.#options.derivationOrigin,
-        },
-      };
-    }
-    return request;
+  #applyTransforms(request: JsonRpcRequest): JsonRpcRequest {
+    return this.#options.transforms.reduce((req, transform) => transform(req), request);
   }
 }

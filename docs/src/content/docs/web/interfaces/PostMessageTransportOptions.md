@@ -5,7 +5,7 @@ next: true
 prev: true
 ---
 
-Defined in: [src/web/postMessageTransport.ts:12](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/postMessageTransport.ts#L12)
+Defined in: [src/web/postMessageTransport.ts:12](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/web/postMessageTransport.ts#L12)
 
 Options for creating a [PostMessageTransport](../classes/PostMessageTransport.md).
 
@@ -15,7 +15,7 @@ Options for creating a [PostMessageTransport](../classes/PostMessageTransport.md
 
 > `optional` **closeOnEstablishTimeout?**: `boolean`
 
-Defined in: [src/web/postMessageTransport.ts:63](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/postMessageTransport.ts#L63)
+Defined in: [src/web/postMessageTransport.ts:63](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/web/postMessageTransport.ts#L63)
 
 Close the signer window if the heartbeat handshake times out.
 
@@ -31,7 +31,7 @@ true;
 
 > `optional` **closeOnPendingTimeout?**: `boolean`
 
-Defined in: [src/web/postMessageTransport.ts:68](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/postMessageTransport.ts#L68)
+Defined in: [src/web/postMessageTransport.ts:68](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/web/postMessageTransport.ts#L68)
 
 Close the signer window if it stays in "pending" status too long.
 
@@ -47,7 +47,7 @@ true;
 
 > `optional` **crypto?**: `Pick`\<`Crypto`, `"randomUUID"`\>
 
-Defined in: [src/web/postMessageTransport.ts:51](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/postMessageTransport.ts#L51)
+Defined in: [src/web/postMessageTransport.ts:51](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/web/postMessageTransport.ts#L51)
 
 Source of random UUIDs for heartbeat request IDs.
 
@@ -63,7 +63,7 @@ globalThis.crypto;
 
 > `optional` **detectNonClickEstablishment?**: `boolean`
 
-Defined in: [src/web/postMessageTransport.ts:75](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/postMessageTransport.ts#L75)
+Defined in: [src/web/postMessageTransport.ts:75](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/web/postMessageTransport.ts#L75)
 
 Detect and reject attempts to open the signer window outside a
 click handler. Browsers like Safari block popups opened without
@@ -81,7 +81,7 @@ true;
 
 > `optional` **disconnectTimeout?**: `number`
 
-Defined in: [src/web/postMessageTransport.ts:41](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/postMessageTransport.ts#L41)
+Defined in: [src/web/postMessageTransport.ts:41](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/web/postMessageTransport.ts#L41)
 
 Time in milliseconds without a heartbeat response after which
 the channel is considered disconnected.
@@ -98,7 +98,7 @@ the channel is considered disconnected.
 
 > `optional` **establishTimeout?**: `number`
 
-Defined in: [src/web/postMessageTransport.ts:29](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/postMessageTransport.ts#L29)
+Defined in: [src/web/postMessageTransport.ts:29](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/web/postMessageTransport.ts#L29)
 
 Time in milliseconds to wait for the ICRC-29 heartbeat handshake to complete.
 
@@ -114,7 +114,7 @@ Time in milliseconds to wait for the ICRC-29 heartbeat handshake to complete.
 
 > `optional` **manageFocus?**: `boolean`
 
-Defined in: [src/web/postMessageTransport.ts:58](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/postMessageTransport.ts#L58)
+Defined in: [src/web/postMessageTransport.ts:58](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/web/postMessageTransport.ts#L58)
 
 Manage focus between the relying party and signer windows.
 When true, the signer window is focused on send and the relying
@@ -132,7 +132,7 @@ true;
 
 > `optional` **pendingTimeout?**: `number`
 
-Defined in: [src/web/postMessageTransport.ts:35](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/postMessageTransport.ts#L35)
+Defined in: [src/web/postMessageTransport.ts:35](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/web/postMessageTransport.ts#L35)
 
 Time in milliseconds the channel can remain in "pending" status
 before the connection is considered failed.
@@ -149,7 +149,7 @@ before the connection is considered failed.
 
 > `optional` **statusPollingRate?**: `number`
 
-Defined in: [src/web/postMessageTransport.ts:46](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/postMessageTransport.ts#L46)
+Defined in: [src/web/postMessageTransport.ts:46](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/web/postMessageTransport.ts#L46)
 
 Interval in milliseconds between ICRC-29 heartbeat status polls.
 
@@ -165,7 +165,7 @@ Interval in milliseconds between ICRC-29 heartbeat status polls.
 
 > **url**: `string`
 
-Defined in: [src/web/postMessageTransport.ts:14](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/postMessageTransport.ts#L14)
+Defined in: [src/web/postMessageTransport.ts:14](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/web/postMessageTransport.ts#L14)
 
 The signer's RPC URL. Must be a secure context (HTTPS, localhost, or 127.0.0.1).
 
@@ -175,7 +175,7 @@ The signer's RPC URL. Must be a secure context (HTTPS, localhost, or 127.0.0.1).
 
 > `optional` **window?**: `Window`
 
-Defined in: [src/web/postMessageTransport.ts:24](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/postMessageTransport.ts#L24)
+Defined in: [src/web/postMessageTransport.ts:24](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/web/postMessageTransport.ts#L24)
 
 The relying party window, used to listen for incoming `postMessage` events.
 
@@ -191,7 +191,7 @@ globalThis.window;
 
 > `optional` **windowOpenerFeatures?**: `string`
 
-Defined in: [src/web/postMessageTransport.ts:19](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/postMessageTransport.ts#L19)
+Defined in: [src/web/postMessageTransport.ts:19](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/web/postMessageTransport.ts#L19)
 
 Window features string passed to `window.open()`.
 

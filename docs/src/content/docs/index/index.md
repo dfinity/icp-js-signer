@@ -21,3 +21,4 @@ prev: true
 
 - [PermissionScope](type-aliases/PermissionScope.md)
 - [PermissionState](type-aliases/PermissionState.md)
+- [SignerRequestTransformFn](type-aliases/SignerRequestTransformFn.md)

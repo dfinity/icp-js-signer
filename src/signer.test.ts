@@ -1,6 +1,6 @@
 import { Principal } from '@icp-sdk/core/principal';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { Signer, SignerError } from './signer.js';
+import { Signer, SignerError, type SignerRequestTransformFn } from './signer.js';
 import type { Channel, JsonRpcRequest, JsonRpcResponse, Transport } from './transport.js';
 
 const NETWORK_ERROR = 4000;
@@ -325,7 +325,34 @@ describe('Signer', () => {
     });
   });
 
-  describe('transformRequest', () => {
+  describe('transforms', () => {
+    it('strips undefined values from requests', async () => {
+      let sentRequest: JsonRpcRequest | undefined;
+      const transport: Transport = {
+        establishChannel: () =>
+          Promise.resolve(
+            createMockChannel(request => {
+              sentRequest = request;
+              return {
+                jsonrpc: '2.0',
+                id: request.id as string,
+                result: { contentMap: btoa('cm'), certificate: btoa('cert') },
+              };
+            }),
+          ),
+      };
+
+      const signer = new Signer({ transport, crypto: mockCrypto });
+      await signer.callCanister({
+        canisterId: Principal.fromText('sgymv-uiaaa-aaaaa-aaaia-cai'),
+        sender: Principal.fromText('sgymv-uiaaa-aaaaa-aaaia-cai'),
+        method: 'transfer',
+        arg: new Uint8Array([1, 2, 3]),
+      });
+
+      expect(sentRequest?.params).not.toHaveProperty('nonce');
+    });
+
     it('adds derivationOrigin to params when configured', async () => {
       let sentRequest: JsonRpcRequest | undefined;
       const transport: Transport = {
@@ -352,7 +379,7 @@ describe('Signer', () => {
       expect(sentRequest?.params).toHaveProperty('icrc95DerivationOrigin', 'https://example.com');
     });
 
-    it('does not add derivationOrigin when not configured', async () => {
+    it('applies custom transforms in order', async () => {
       let sentRequest: JsonRpcRequest | undefined;
       const transport: Transport = {
         establishChannel: () =>
@@ -368,12 +395,41 @@ describe('Signer', () => {
           ),
       };
 
-      const signer = new Signer({ transport, crypto: mockCrypto });
+      const addFoo: SignerRequestTransformFn = request => ({
+        ...request,
+        params: { ...request.params, foo: 'bar' },
+      });
+
+      const signer = new Signer({
+        transport,
+        crypto: mockCrypto,
+        transforms: [addFoo],
+      });
       await signer.getSupportedStandards();
 
-      expect(
-        (sentRequest?.params as Record<string, unknown>)?.icrc95DerivationOrigin,
-      ).toBeUndefined();
+      expect(sentRequest?.params).toHaveProperty('foo', 'bar');
+    });
+
+    it('sends request unmodified when transforms is empty', async () => {
+      let sentRequest: JsonRpcRequest | undefined;
+      const transport: Transport = {
+        establishChannel: () =>
+          Promise.resolve(
+            createMockChannel(request => {
+              sentRequest = request;
+              return {
+                jsonrpc: '2.0',
+                id: request.id as string,
+                result: { supportedStandards: [] },
+              };
+            }),
+          ),
+      };
+
+      const signer = new Signer({ transport, crypto: mockCrypto, transforms: [] });
+      await signer.getSupportedStandards();
+
+      expect(sentRequest?.method).toBe('icrc25_supported_standards');
     });
   });
 

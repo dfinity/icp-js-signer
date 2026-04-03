@@ -5,7 +5,7 @@ next: true
 prev: true
 ---
 
-Defined in: [src/web/heartbeat/server.ts:42](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/heartbeat/server.ts#L42)
+Defined in: [src/web/heartbeat/server.ts:42](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/web/heartbeat/server.ts#L42)
 
 ## Constructors
 
@@ -13,7 +13,7 @@ Defined in: [src/web/heartbeat/server.ts:42](https://github.com/dfinity/icp-js-s
 
 > **new HeartbeatServer**(`options`): `HeartbeatServer`
 
-Defined in: [src/web/heartbeat/server.ts:45](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/heartbeat/server.ts#L45)
+Defined in: [src/web/heartbeat/server.ts:45](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/web/heartbeat/server.ts#L45)
 
 #### Parameters
 
@@ -31,7 +31,7 @@ Defined in: [src/web/heartbeat/server.ts:45](https://github.com/dfinity/icp-js-s
 
 > **changeStatus**(`status`): `void`
 
-Defined in: [src/web/heartbeat/server.ts:58](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/heartbeat/server.ts#L58)
+Defined in: [src/web/heartbeat/server.ts:58](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/web/heartbeat/server.ts#L58)
 
 #### Parameters
 

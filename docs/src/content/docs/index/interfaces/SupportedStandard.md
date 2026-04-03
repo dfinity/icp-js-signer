@@ -5,7 +5,7 @@ next: true
 prev: true
 ---
 
-Defined in: [src/signer.ts:72](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/signer.ts#L72)
+Defined in: [src/signer.ts:104](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/signer.ts#L104)
 
 A standard supported by the signer, as returned by
 [Signer.getSupportedStandards](../classes/Signer.md#getsupportedstandards). The `name` field contains
@@ -18,7 +18,7 @@ to the specification.
 
 > **name**: `string`
 
-Defined in: [src/signer.ts:73](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/signer.ts#L73)
+Defined in: [src/signer.ts:105](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/signer.ts#L105)
 
 ---
 
@@ -26,4 +26,4 @@ Defined in: [src/signer.ts:73](https://github.com/dfinity/icp-js-signer/blob/fb5
 
 > **url**: `string`
 
-Defined in: [src/signer.ts:74](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/signer.ts#L74)
+Defined in: [src/signer.ts:106](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/signer.ts#L106)
