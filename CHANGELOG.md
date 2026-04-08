@@ -2,6 +2,15 @@
 
 ## 5.3.0 (2026-04-08)
 
+### Feat
+
+- Add configurable request transform pipeline to `Signer`
+- Export `SignerRequestTransformFn` type for authoring custom transforms
+
+### Fix
+
+- Strip `undefined` properties from JSON-RPC requests before sending
+
 ## v5.2.0 (2026-03-31)
 
 ### Feat
