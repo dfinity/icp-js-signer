@@ -55,9 +55,12 @@ const asArray = (value: unknown): unknown[] | undefined =>
 export type SignerRequestTransformFn = (request: JsonRpcRequest) => JsonRpcRequest;
 
 /**
- * Ensures a JSON-RPC request contains only valid JSON values.
- * Properties with `undefined` values are stripped, and non-serializable
- * values such as `BigInt` will cause an error.
+ * Ensures a JSON-RPC request contains only valid JSON values by
+ * round-tripping through `JSON.stringify` / `JSON.parse`.
+ *
+ * - Properties with `undefined` values are stripped.
+ * - `undefined`, `NaN`, and `Infinity` inside arrays become `null`.
+ * - Non-serializable values such as `BigInt` will cause an error.
  * @param request - The JSON-RPC request to clean.
  */
 const jsonCleanTransform: SignerRequestTransformFn = request => JSON.parse(JSON.stringify(request));
@@ -141,7 +144,8 @@ export interface SignerOptions<T extends Transport> {
    */
   crypto?: Pick<Crypto, 'randomUUID'>;
   /**
-   * Additional transform functions applied to each outgoing JSON-RPC request.
+   * Additional transform functions applied to each outgoing JSON-RPC request,
+   * can be used to e.g. add additional params to every request as seen in ICRC-95.
    * Transforms are applied in order; each receives the output of the previous one.
    */
   transforms?: SignerRequestTransformFn[];
@@ -245,13 +249,13 @@ export class Signer<T extends Transport = Transport> {
 
     const { promise, resolve, reject } = Promise.withResolvers<JsonRpcResponse>();
 
-    const responseListener = channel.addEventListener('response', response => {
+    const removeResponseListener = channel.addEventListener('response', response => {
       if (response.id !== request.id) {
         return;
       }
 
-      responseListener();
-      closeListener();
+      removeResponseListener();
+      removeCloseListener();
 
       // Validate that error responses have the expected shape,
       // normalize invalid ones so #rpc can trust the types
@@ -280,9 +284,9 @@ export class Signer<T extends Transport = Transport> {
       }
     });
 
-    const closeListener = channel.addEventListener('close', () => {
-      responseListener();
-      closeListener();
+    const removeCloseListener = channel.addEventListener('close', () => {
+      removeResponseListener();
+      removeCloseListener();
       reject(
         new SignerError({
           code: NETWORK_ERROR,
@@ -295,8 +299,8 @@ export class Signer<T extends Transport = Transport> {
     try {
       transformedRequest = this.#applyTransforms(request);
     } catch (cause) {
-      responseListener();
-      closeListener();
+      removeResponseListener();
+      removeCloseListener();
       reject(
         new SignerError(
           {
@@ -312,8 +316,8 @@ export class Signer<T extends Transport = Transport> {
     try {
       await channel.send(transformedRequest);
     } catch (error) {
-      responseListener();
-      closeListener();
+      removeResponseListener();
+      removeCloseListener();
       reject(
         new SignerError(
           {
