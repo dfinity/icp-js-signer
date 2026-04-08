@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fix
+
+- use OIDC trusted publishing for npm releases (#10)
+
 ## 5.3.0 (2026-04-08)
 
 ### Feat
