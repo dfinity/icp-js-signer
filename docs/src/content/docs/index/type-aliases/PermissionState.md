@@ -7,7 +7,7 @@ prev: true
 
 > **PermissionState** = `"denied"` \| `"ask_on_use"` \| `"granted"`
 
-Defined in: [src/signer.ts:64](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/signer.ts#L64)
+Defined in: [src/signer.ts:96](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/signer.ts#L96)
 
 The state of a permission scope as reported by the signer.
 

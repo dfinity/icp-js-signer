@@ -5,7 +5,7 @@ next: true
 prev: true
 ---
 
-Defined in: [src/web/postMessageChannel.ts:42](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/postMessageChannel.ts#L42)
+Defined in: [src/web/postMessageChannel.ts:42](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/web/postMessageChannel.ts#L42)
 
 A [Channel](../../index/interfaces/Channel.md) implementation that communicates with a signer
 via `window.postMessage`. Created by [PostMessageTransport](PostMessageTransport.md)
@@ -25,7 +25,7 @@ outgoing messages are queued and flushed when it becomes `"ready"`.
 
 > **new PostMessageChannel**(`options`): `PostMessageChannel`
 
-Defined in: [src/web/postMessageChannel.ts:48](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/postMessageChannel.ts#L48)
+Defined in: [src/web/postMessageChannel.ts:48](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/web/postMessageChannel.ts#L48)
 
 #### Parameters
 
@@ -45,7 +45,7 @@ Defined in: [src/web/postMessageChannel.ts:48](https://github.com/dfinity/icp-js
 
 > **get** **closed**(): `boolean`
 
-Defined in: [src/web/postMessageChannel.ts:58](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/postMessageChannel.ts#L58)
+Defined in: [src/web/postMessageChannel.ts:58](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/web/postMessageChannel.ts#L58)
 
 Whether this channel has been closed.
 
@@ -63,7 +63,7 @@ Whether this channel has been closed.
 
 > **addEventListener**(...`__namedParameters`): () => `void`
 
-Defined in: [src/web/postMessageChannel.ts:62](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/postMessageChannel.ts#L62)
+Defined in: [src/web/postMessageChannel.ts:62](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/web/postMessageChannel.ts#L62)
 
 #### Parameters
 
@@ -85,7 +85,7 @@ Defined in: [src/web/postMessageChannel.ts:62](https://github.com/dfinity/icp-js
 
 > **changeStatus**(`status`): `void`
 
-Defined in: [src/web/postMessageChannel.ts:141](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/postMessageChannel.ts#L141)
+Defined in: [src/web/postMessageChannel.ts:145](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/web/postMessageChannel.ts#L145)
 
 Updates the signer status. When transitioning to `"ready"`,
 all queued messages are flushed to the signer window.
@@ -108,7 +108,7 @@ The new signer status.
 
 > **close**(): `Promise`\<`void`\>
 
-Defined in: [src/web/postMessageChannel.ts:118](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/postMessageChannel.ts#L118)
+Defined in: [src/web/postMessageChannel.ts:122](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/web/postMessageChannel.ts#L122)
 
 Closes the signer window and notifies all close listeners.
 
@@ -126,7 +126,7 @@ Closes the signer window and notifies all close listeners.
 
 > **send**(`request`): `Promise`\<`void`\>
 
-Defined in: [src/web/postMessageChannel.ts:99](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/postMessageChannel.ts#L99)
+Defined in: [src/web/postMessageChannel.ts:99](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/web/postMessageChannel.ts#L99)
 
 Sends a JSON-RPC request to the signer. If the signer status is
 `"pending"`, the request is queued until [changeStatus](#changestatus) is

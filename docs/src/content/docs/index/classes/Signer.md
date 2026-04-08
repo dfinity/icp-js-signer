@@ -5,7 +5,7 @@ next: true
 prev: true
 ---
 
-Defined in: [src/signer.ts:141](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/signer.ts#L141)
+Defined in: [src/signer.ts:178](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/signer.ts#L178)
 
 Client for interacting with an ICRC-25 compliant signer.
 
@@ -42,7 +42,7 @@ const accounts = await signer.getAccounts();
 
 > **new Signer**\<`T`\>(`options`): `Signer`\<`T`\>
 
-Defined in: [src/signer.ts:148](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/signer.ts#L148)
+Defined in: [src/signer.ts:185](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/signer.ts#L185)
 
 #### Parameters
 
@@ -62,7 +62,7 @@ Defined in: [src/signer.ts:148](https://github.com/dfinity/icp-js-signer/blob/fb
 
 > **get** **transport**(): `T`
 
-Defined in: [src/signer.ts:158](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/signer.ts#L158)
+Defined in: [src/signer.ts:202](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/signer.ts#L202)
 
 The transport used to communicate with the signer.
 
@@ -76,7 +76,7 @@ The transport used to communicate with the signer.
 
 > **callCanister**(`params`): `Promise`\<\{ `certificate`: `Uint8Array`; `contentMap`: `Uint8Array`; \}\>
 
-Defined in: [src/signer.ts:460](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/signer.ts#L460)
+Defined in: [src/signer.ts:524](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/signer.ts#L524)
 
 Requests the signer to execute a canister call on behalf of the user.
 The signer will prompt the user for approval before signing and
@@ -135,7 +135,7 @@ https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_49_c
 
 > **closeChannel**(): `Promise`\<`void`\>
 
-Defined in: [src/signer.ts:194](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/signer.ts#L194)
+Defined in: [src/signer.ts:238](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/signer.ts#L238)
 
 Closes the current communication channel, if open.
 
@@ -149,7 +149,7 @@ Closes the current communication channel, if open.
 
 > **getAccounts**(): `Promise`\<`object`[]\>
 
-Defined in: [src/signer.ts:362](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/signer.ts#L362)
+Defined in: [src/signer.ts:426](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/signer.ts#L426)
 
 Requests the accounts managed by the signer.
 Each account has an owner Principal and an optional 32-byte subaccount.
@@ -170,7 +170,7 @@ https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_27_a
 
 > **getPermissions**(): `Promise`\<`object`[]\>
 
-Defined in: [src/signer.ts:333](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/signer.ts#L333)
+Defined in: [src/signer.ts:397](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/signer.ts#L397)
 
 Queries the current state of all permission scopes.
 
@@ -186,7 +186,7 @@ The current permission state for each scope the signer supports.
 
 > **getSupportedStandards**(): `Promise`\<[`SupportedStandard`](../interfaces/SupportedStandard.md)[]\>
 
-Defined in: [src/signer.ts:275](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/signer.ts#L275)
+Defined in: [src/signer.ts:339](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/signer.ts#L339)
 
 Queries which ICRC standards the signer supports.
 Use this to determine signer capabilities before calling other methods.
@@ -205,7 +205,7 @@ https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_25_s
 
 > **openChannel**(): `Promise`\<[`Channel`](../interfaces/Channel.md)\>
 
-Defined in: [src/signer.ts:166](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/signer.ts#L166)
+Defined in: [src/signer.ts:210](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/signer.ts#L210)
 
 Opens a communication channel with the signer.
 Reuses an existing open channel if available.
@@ -220,7 +220,7 @@ Reuses an existing open channel if available.
 
 > **requestDelegation**(`params`): `Promise`\<`DelegationChain`\>
 
-Defined in: [src/signer.ts:400](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/signer.ts#L400)
+Defined in: [src/signer.ts:464](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/signer.ts#L464)
 
 Requests a delegation chain from the signer for session-based authentication.
 This allows the relying party to sign canister calls without requiring
@@ -268,7 +268,7 @@ https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_34_d
 
 > **requestPermissions**(`scopes`): `Promise`\<`object`[]\>
 
-Defined in: [src/signer.ts:303](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/signer.ts#L303)
+Defined in: [src/signer.ts:367](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/signer.ts#L367)
 
 Requests the signer to grant permission for the given scopes.
 The signer may prompt the user for approval.
@@ -293,7 +293,7 @@ The current state of each requested scope after the user's decision.
 
 > **sendRequest**(`request`): `Promise`\<`JsonRpcResponse`\>
 
-Defined in: [src/signer.ts:202](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/signer.ts#L202)
+Defined in: [src/signer.ts:246](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/signer.ts#L246)
 
 Sends a JSON-RPC request over the transport channel.
 

@@ -5,7 +5,7 @@ next: true
 prev: true
 ---
 
-Defined in: [src/transport.ts:16](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/transport.ts#L16)
+Defined in: [src/transport.ts:16](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/transport.ts#L16)
 
 ## Properties
 
@@ -13,7 +13,7 @@ Defined in: [src/transport.ts:16](https://github.com/dfinity/icp-js-signer/blob/
 
 > **closed**: `boolean`
 
-Defined in: [src/transport.ts:17](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/transport.ts#L17)
+Defined in: [src/transport.ts:17](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/transport.ts#L17)
 
 ## Methods
 
@@ -23,7 +23,7 @@ Defined in: [src/transport.ts:17](https://github.com/dfinity/icp-js-signer/blob/
 
 > **addEventListener**(`event`, `listener`): () => `void`
 
-Defined in: [src/transport.ts:19](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/transport.ts#L19)
+Defined in: [src/transport.ts:19](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/transport.ts#L19)
 
 ##### Parameters
 
@@ -43,7 +43,7 @@ Defined in: [src/transport.ts:19](https://github.com/dfinity/icp-js-signer/blob/
 
 > **addEventListener**(`event`, `listener`): () => `void`
 
-Defined in: [src/transport.ts:21](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/transport.ts#L21)
+Defined in: [src/transport.ts:21](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/transport.ts#L21)
 
 ##### Parameters
 
@@ -65,7 +65,7 @@ Defined in: [src/transport.ts:21](https://github.com/dfinity/icp-js-signer/blob/
 
 > **close**(): `Promise`\<`void`\>
 
-Defined in: [src/transport.ts:25](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/transport.ts#L25)
+Defined in: [src/transport.ts:25](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/transport.ts#L25)
 
 #### Returns
 
@@ -77,7 +77,7 @@ Defined in: [src/transport.ts:25](https://github.com/dfinity/icp-js-signer/blob/
 
 > **send**(`request`): `Promise`\<`void`\>
 
-Defined in: [src/transport.ts:23](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/transport.ts#L23)
+Defined in: [src/transport.ts:23](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/transport.ts#L23)
 
 #### Parameters
 

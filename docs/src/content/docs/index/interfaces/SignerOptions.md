@@ -5,7 +5,7 @@ next: true
 prev: true
 ---
 
-Defined in: [src/signer.ts:96](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/signer.ts#L96)
+Defined in: [src/signer.ts:128](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/signer.ts#L128)
 
 Options for creating a [Signer](../classes/Signer.md) instance.
 
@@ -21,7 +21,7 @@ Options for creating a [Signer](../classes/Signer.md) instance.
 
 > `optional` **autoCloseTransportChannel?**: `boolean`
 
-Defined in: [src/signer.ts:103](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/signer.ts#L103)
+Defined in: [src/signer.ts:135](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/signer.ts#L135)
 
 Automatically close the transport channel after a response is received.
 
@@ -37,7 +37,7 @@ true;
 
 > `optional` **closeTransportChannelAfter?**: `number`
 
-Defined in: [src/signer.ts:108](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/signer.ts#L108)
+Defined in: [src/signer.ts:140](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/signer.ts#L140)
 
 Delay in milliseconds before auto-closing the transport channel.
 
@@ -53,7 +53,7 @@ Delay in milliseconds before auto-closing the transport channel.
 
 > `optional` **crypto?**: `Pick`\<`Crypto`, `"randomUUID"`\>
 
-Defined in: [src/signer.ts:113](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/signer.ts#L113)
+Defined in: [src/signer.ts:145](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/signer.ts#L145)
 
 Source of random UUIDs for JSON-RPC request IDs.
 
@@ -69,7 +69,7 @@ globalThis.crypto;
 
 > `optional` **derivationOrigin?**: `string`
 
-Defined in: [src/signer.ts:119](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/signer.ts#L119)
+Defined in: [src/signer.ts:156](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/signer.ts#L156)
 
 Derivation origin for ICRC-95 identity derivation.
 When set, all requests include an `icrc95DerivationOrigin` param.
@@ -80,10 +80,21 @@ https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_95_d
 
 ---
 
+### transforms?
+
+> `optional` **transforms?**: [`SignerRequestTransformFn`](../type-aliases/SignerRequestTransformFn.md)[]
+
+Defined in: [src/signer.ts:150](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/signer.ts#L150)
+
+Additional transform functions applied to each outgoing JSON-RPC request.
+Transforms are applied in order; each receives the output of the previous one.
+
+---
+
 ### transport
 
 > **transport**: `T`
 
-Defined in: [src/signer.ts:98](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/signer.ts#L98)
+Defined in: [src/signer.ts:130](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/signer.ts#L130)
 
 The transport used to communicate with the signer.

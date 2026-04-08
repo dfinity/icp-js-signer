@@ -5,7 +5,7 @@ next: true
 prev: true
 ---
 
-Defined in: [src/web/postMessageTransport.ts:99](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/postMessageTransport.ts#L99)
+Defined in: [src/web/postMessageTransport.ts:99](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/web/postMessageTransport.ts#L99)
 
 ICRC-29 post message transport for communicating with web-based signers.
 
@@ -34,7 +34,7 @@ const signer = new Signer({ transport });
 
 > **new PostMessageTransport**(`options`): `PostMessageTransport`
 
-Defined in: [src/web/postMessageTransport.ts:102](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/postMessageTransport.ts#L102)
+Defined in: [src/web/postMessageTransport.ts:102](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/web/postMessageTransport.ts#L102)
 
 #### Parameters
 
@@ -52,7 +52,7 @@ Defined in: [src/web/postMessageTransport.ts:102](https://github.com/dfinity/icp
 
 > **establishChannel**(): `Promise`\<[`PostMessageChannel`](PostMessageChannel.md)\>
 
-Defined in: [src/web/postMessageTransport.ts:142](https://github.com/dfinity/icp-js-signer/blob/fb52342d12dece5ff1354c346aa4faf01d6b61ee/src/web/postMessageTransport.ts#L142)
+Defined in: [src/web/postMessageTransport.ts:142](https://github.com/dfinity/icp-js-signer/blob/bc1592044d269bf4f011f0f9d3a0f0cb39ff5833/src/web/postMessageTransport.ts#L142)
 
 Opens the signer window and establishes a communication channel
 via the ICRC-29 heartbeat handshake.
