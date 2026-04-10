@@ -30,10 +30,10 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Python
-        uses: dfinity/ci-tools/actions/setup-python@main
+        uses: dfinity/ci-tools/actions/setup-python@afeee4fbdc0683a88ec5a74ed7f59a2ce0e833ad # main
 
       - name: Setup Commitizen
-        uses: dfinity/ci-tools/actions/setup-commitizen@main
+        uses: dfinity/ci-tools/actions/setup-commitizen@afeee4fbdc0683a88ec5a74ed7f59a2ce0e833ad # main
 
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -49,7 +49,7 @@ jobs:
 
       - name: Bump version
         id: bump_version
-        uses: dfinity/ci-tools/actions/bump-version@main
+        uses: dfinity/ci-tools/actions/bump-version@afeee4fbdc0683a88ec5a74ed7f59a2ce0e833ad # main
         with:
           prerelease: ${{ inputs.beta_release == true && 'beta' || '' }}
 
@@ -57,7 +57,7 @@ jobs:
         run: echo "Bumping to version ${{ steps.bump_version.outputs.version }}"
 
       - name: Create Pull Request
-        uses: dfinity/ci-tools/actions/create-pr@main
+        uses: dfinity/ci-tools/actions/create-pr@afeee4fbdc0683a88ec5a74ed7f59a2ce0e833ad # main
         with:
           token: ${{ steps.generate_token.outputs.token }}
           branch_name: 'release/${{ steps.bump_version.outputs.version }}'
