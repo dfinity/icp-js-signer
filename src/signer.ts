@@ -182,6 +182,14 @@ export class Signer<T extends Transport = Transport> {
   #channel?: Channel;
   #establishingChannel?: Promise<void>;
   #scheduledChannelClosure?: ReturnType<typeof setTimeout>;
+  /**
+   * Number of `sendRequest` calls that have been issued but have not
+   * yet resolved (response received, channel closed, or transform/send
+   * error). Used to gate the auto-close timer so concurrent requests
+   * issued via `Promise.all` don't lose their channel mid-flight when
+   * the first response arrives.
+   */
+  #pendingRequestCount = 0;
 
   constructor(options: SignerOptions<T>) {
     const transforms: SignerRequestTransformFn[] = [...(options.transforms ?? [])];
@@ -249,6 +257,25 @@ export class Signer<T extends Transport = Transport> {
 
     const { promise, resolve, reject } = Promise.withResolvers<JsonRpcResponse>();
 
+    // Notifications (no `id`) are send-and-forget per JSON-RPC and never
+    // produce a response, so they don't keep the channel busy and aren't
+    // tracked here. The promise still settles via the close-listener path
+    // when the channel eventually closes.
+    const expectsResponse = request.id !== undefined && request.id !== null;
+    if (expectsResponse) {
+      this.#pendingRequestCount++;
+    }
+    let settled = false;
+    const settle = () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      if (expectsResponse) {
+        this.#pendingRequestCount--;
+      }
+    };
+
     const removeResponseListener = channel.addEventListener('response', response => {
       if (response.id !== request.id) {
         return;
@@ -256,6 +283,7 @@ export class Signer<T extends Transport = Transport> {
 
       removeResponseListener();
       removeCloseListener();
+      settle();
 
       // Validate that error responses have the expected shape,
       // normalize invalid ones so #rpc can trust the types
@@ -275,7 +303,13 @@ export class Signer<T extends Transport = Transport> {
         resolve(response);
       }
 
-      if (this.#options.autoCloseTransportChannel) {
+      // Only schedule the channel close once every concurrent request has
+      // resolved. Without this, a `Promise.all([signIn, requestAttributes])`
+      // would lose the channel mid-flight: the first response would schedule
+      // the close, and the timer would fire before the second response (or
+      // before the user could interact with a consent prompt the second
+      // request requires).
+      if (this.#options.autoCloseTransportChannel && this.#pendingRequestCount === 0) {
         this.#scheduledChannelClosure = setTimeout(() => {
           if (!channel.closed) {
             channel.close();
@@ -287,6 +321,7 @@ export class Signer<T extends Transport = Transport> {
     const removeCloseListener = channel.addEventListener('close', () => {
       removeResponseListener();
       removeCloseListener();
+      settle();
       reject(
         new SignerError({
           code: NETWORK_ERROR,
@@ -301,6 +336,7 @@ export class Signer<T extends Transport = Transport> {
     } catch (cause) {
       removeResponseListener();
       removeCloseListener();
+      settle();
       reject(
         new SignerError(
           {
@@ -318,6 +354,7 @@ export class Signer<T extends Transport = Transport> {
     } catch (error) {
       removeResponseListener();
       removeCloseListener();
+      settle();
       reject(
         new SignerError(
           {

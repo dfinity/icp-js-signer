@@ -433,6 +433,85 @@ describe('Signer', () => {
     });
   });
 
+  describe('autoCloseTransportChannel', () => {
+    it('does not close the channel while another request is still pending', async () => {
+      const closeSpy = vi.fn(() => Promise.resolve());
+      const responseListeners = new Set<(response: JsonRpcResponse) => void>();
+
+      const channel: Channel = {
+        closed: false,
+        addEventListener(...args: [string, (...args: any[]) => void]) {
+          const [event, listener] = args;
+          if (event === 'response') {
+            responseListeners.add(listener);
+            return () => {
+              responseListeners.delete(listener);
+            };
+          }
+          return () => {};
+        },
+        // No automatic response — the test triggers responses manually so
+        // it can hold one request open while letting the other complete.
+        send: () => Promise.resolve(),
+        close() {
+          this.closed = true;
+          return closeSpy();
+        },
+      };
+
+      const transport: Transport = { establishChannel: () => Promise.resolve(channel) };
+      const signer = new Signer({
+        transport,
+        crypto: mockCrypto,
+        closeTransportChannelAfter: 50,
+      });
+
+      const first = signer.sendRequest({ jsonrpc: '2.0', id: 'test-id-1', method: 'a' });
+      const second = signer.sendRequest({ jsonrpc: '2.0', id: 'test-id-2', method: 'b' });
+
+      // Drain enough microtasks for both sendRequest awaits (openChannel +
+      // channel.send) to settle so the response listeners are registered
+      // before the test fires synthetic responses.
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      // First responds, second is still pending — channel must stay open.
+      responseListeners.forEach(l => l({ jsonrpc: '2.0', id: 'test-id-1', result: 'first' }));
+      await first;
+      await new Promise(resolve => setTimeout(resolve, 100));
+      expect(closeSpy).not.toHaveBeenCalled();
+
+      // Second responds — now no pending requests, so the close timer fires.
+      responseListeners.forEach(l => l({ jsonrpc: '2.0', id: 'test-id-2', result: 'second' }));
+      await second;
+      await new Promise(resolve => setTimeout(resolve, 100));
+      expect(closeSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('closes the channel after a request without pending peers', async () => {
+      const closeSpy = vi.fn(() => Promise.resolve());
+      const transport: Transport = {
+        establishChannel: () =>
+          Promise.resolve({
+            ...createMockChannel(request => ({
+              jsonrpc: '2.0',
+              id: request.id ?? 'unknown',
+              result: 'ok',
+            })),
+            close: closeSpy,
+          }),
+      };
+      const signer = new Signer({
+        transport,
+        crypto: mockCrypto,
+        closeTransportChannelAfter: 50,
+      });
+
+      await signer.sendRequest({ jsonrpc: '2.0', id: 'test-id-1', method: 'solo' });
+      await new Promise(resolve => setTimeout(resolve, 100));
+      expect(closeSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('sendRequest', () => {
     it('ignores responses with non-matching ids', async () => {
       const transport: Transport = {
