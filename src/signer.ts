@@ -182,13 +182,6 @@ export class Signer<T extends Transport = Transport> {
   #channel?: Channel;
   #establishingChannel?: Promise<void>;
   #scheduledChannelClosure?: ReturnType<typeof setTimeout>;
-  /**
-   * Number of `sendRequest` calls that have been issued but have not
-   * yet resolved (response received, channel closed, or transform/send
-   * error). Used to gate the auto-close timer so concurrent requests
-   * issued via `Promise.all` don't lose their channel mid-flight when
-   * the first response arrives.
-   */
   #pendingRequestCount = 0;
 
   constructor(options: SignerOptions<T>) {
