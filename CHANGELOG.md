@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fix
+
+- only auto-close transport channel when no pending requests (#17)
+
 ## 5.3.0 (2026-04-08)
 
 ### Feat
