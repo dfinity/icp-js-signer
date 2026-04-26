@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 5.3.1 (2026-04-26)
 
 ### Fix
 
