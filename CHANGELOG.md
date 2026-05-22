@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Feat
+
+- **signer**: allow toggling autoCloseTransportChannel at runtime (#21)
+
 ## 5.3.1 (2026-04-26)
 
 ### Fix
