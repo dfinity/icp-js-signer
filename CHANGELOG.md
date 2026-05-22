@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 5.4.0 (2026-05-22)
 
 ### Feat
 
