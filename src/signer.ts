@@ -206,6 +206,24 @@ export class Signer<T extends Transport = Transport> {
   }
 
   /**
+   * Whether the transport channel auto-closes after a response is received.
+   * Can be toggled at runtime, which is useful for multi-step flows that
+   * need to await async work between requests without losing the channel.
+   * Setting this to `false` also cancels any auto-close already scheduled
+   * by a prior response.
+   */
+  get autoCloseTransportChannel(): boolean {
+    return this.#options.autoCloseTransportChannel;
+  }
+
+  set autoCloseTransportChannel(value: boolean) {
+    this.#options.autoCloseTransportChannel = value;
+    if (!value) {
+      clearTimeout(this.#scheduledChannelClosure);
+    }
+  }
+
+  /**
    * Opens a communication channel with the signer.
    * Reuses an existing open channel if available.
    */

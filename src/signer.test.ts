@@ -510,6 +510,104 @@ describe('Signer', () => {
       await new Promise(resolve => setTimeout(resolve, 100));
       expect(closeSpy).toHaveBeenCalledTimes(1);
     });
+
+    it('does not close the channel when toggled off at runtime', async () => {
+      const closeSpy = vi.fn(() => Promise.resolve());
+      const transport: Transport = {
+        establishChannel: () =>
+          Promise.resolve({
+            ...createMockChannel(request => ({
+              jsonrpc: '2.0',
+              id: request.id ?? 'unknown',
+              result: 'ok',
+            })),
+            close: closeSpy,
+          }),
+      };
+      const signer = new Signer({
+        transport,
+        crypto: mockCrypto,
+        closeTransportChannelAfter: 50,
+      });
+
+      signer.autoCloseTransportChannel = false;
+      await signer.sendRequest({ jsonrpc: '2.0', id: 'test-id-1', method: 'solo' });
+      await new Promise(resolve => setTimeout(resolve, 100));
+      expect(closeSpy).not.toHaveBeenCalled();
+    });
+
+    it('cancels an already-scheduled auto-close when toggled off', async () => {
+      const closeSpy = vi.fn(() => Promise.resolve());
+      const transport: Transport = {
+        establishChannel: () =>
+          Promise.resolve({
+            ...createMockChannel(request => ({
+              jsonrpc: '2.0',
+              id: request.id ?? 'unknown',
+              result: 'ok',
+            })),
+            close: closeSpy,
+          }),
+      };
+      const signer = new Signer({
+        transport,
+        crypto: mockCrypto,
+        closeTransportChannelAfter: 50,
+      });
+
+      await signer.sendRequest({ jsonrpc: '2.0', id: 'test-id-1', method: 'solo' });
+      // Close has been scheduled but not yet fired (timer is 50ms).
+      signer.autoCloseTransportChannel = false;
+      await new Promise(resolve => setTimeout(resolve, 100));
+      expect(closeSpy).not.toHaveBeenCalled();
+    });
+
+    it('reflects the current toggle state via the getter', () => {
+      const signer = new Signer({
+        transport: createMockTransport(request => ({
+          jsonrpc: '2.0',
+          id: request.id ?? 'unknown',
+          result: 'ok',
+        })),
+        crypto: mockCrypto,
+      });
+
+      expect(signer.autoCloseTransportChannel).toBe(true);
+      signer.autoCloseTransportChannel = false;
+      expect(signer.autoCloseTransportChannel).toBe(false);
+      signer.autoCloseTransportChannel = true;
+      expect(signer.autoCloseTransportChannel).toBe(true);
+    });
+
+    it('resumes auto-closing when re-enabled before a subsequent request', async () => {
+      const closeSpy = vi.fn(() => Promise.resolve());
+      const transport: Transport = {
+        establishChannel: () =>
+          Promise.resolve({
+            ...createMockChannel(request => ({
+              jsonrpc: '2.0',
+              id: request.id ?? 'unknown',
+              result: 'ok',
+            })),
+            close: closeSpy,
+          }),
+      };
+      const signer = new Signer({
+        transport,
+        crypto: mockCrypto,
+        closeTransportChannelAfter: 50,
+      });
+
+      signer.autoCloseTransportChannel = false;
+      await signer.sendRequest({ jsonrpc: '2.0', id: 'test-id-1', method: 'first' });
+      await new Promise(resolve => setTimeout(resolve, 100));
+      expect(closeSpy).not.toHaveBeenCalled();
+
+      signer.autoCloseTransportChannel = true;
+      await signer.sendRequest({ jsonrpc: '2.0', id: 'test-id-2', method: 'second' });
+      await new Promise(resolve => setTimeout(resolve, 100));
+      expect(closeSpy).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('sendRequest', () => {
