@@ -46,6 +46,8 @@ The [ICRC-167](https://github.com/dfinity/wg-identity-authentication/blob/main/t
 
 The `callbackUrl` must be an absolute URL on an origin you control and be declared in that origin's `/.well-known/ii-auth-callbacks` allow-list.
 
+A relying party typically has several flows (connect, sign, request attributes, …). Give each one its own `callbackUrl` — that is how a return is routed back to the right flow, and each flow automatically gets its own persisted journal (keyed by its callback), so no storage keys need configuring. An unfinished flow's journal expires after `flowTimeout` (default 10 minutes), so an abandoned flow — and any single-use value it captured — is not resumed later.
+
 Because a top-level redirect unloads the page, the transport persists completed request results (keyed by call order) and replays them on the return load. Your flow code must therefore run on every load and issue the same sequence of requests in the same order — branch only on values recovered from earlier responses, and keep side effects out of the sequence, since it re-executes on each round-trip.
 
 ```ts

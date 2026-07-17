@@ -43,9 +43,11 @@ const createChannel = (
     callbackUrl: CALLBACK,
     storage,
     storageKey: KEY,
+    flowTimeout: 1_000_000,
     location: location as UrlFlowOptions['location'],
     history: { replaceState: vi.fn() },
     crypto,
+    now: () => 1000,
   });
   return { channel: new UrlChannel(flow), flow, storage, location };
 };

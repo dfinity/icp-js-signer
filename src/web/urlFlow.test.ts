@@ -5,6 +5,7 @@ import { UrlFlow, type UrlFlowOptions } from './urlFlow.js';
 const URL_ = 'https://signer.example.com/icrc-167';
 const CALLBACK = 'https://relying.example.com/signer-callback';
 const KEY = 'icrc167:flow';
+const NOW = 1000;
 
 const createStorage = (seed: Record<string, string> = {}) => {
   const map = new Map<string, string>(Object.entries(seed));
@@ -35,6 +36,8 @@ const createFlow = (
     location?: MockLocation;
     history?: { replaceState: ReturnType<typeof vi.fn> };
     states?: string[];
+    now?: () => number;
+    flowTimeout?: number;
   } = {},
 ) => {
   const storage = overrides.storage ?? createStorage();
@@ -48,9 +51,11 @@ const createFlow = (
     callbackUrl: CALLBACK,
     storage,
     storageKey: KEY,
+    flowTimeout: overrides.flowTimeout ?? 1_000_000,
     location: location as UrlFlowOptions['location'],
     history,
     crypto,
+    now: overrides.now ?? (() => NOW),
   });
   return { flow, storage, location, history };
 };
@@ -74,11 +79,16 @@ describe('UrlFlow', () => {
     expect(flow.next()).toBe(2);
   });
 
-  it('records a value and persists it', () => {
+  it('is not resumable without a stored flow', () => {
+    expect(createFlow().flow.resumable).toBe(false);
+  });
+
+  it('records a value, persists it, and stamps createdAt', () => {
     const { flow, storage } = createFlow();
     flow.record(flow.next(), 'nonce');
     expect(flow.get(0)).toBe('nonce');
-    expect(readStored(storage)).toEqual({ results: { 0: 'nonce' } });
+    expect(readStored(storage).results).toEqual({ 0: 'nonce' });
+    expect(readStored(storage).createdAt).toBe(NOW);
   });
 
   it('navigates a single request with message, callback and state', () => {
@@ -113,11 +123,26 @@ describe('UrlFlow', () => {
     expect(flow.navigated).toBe(true);
   });
 
+  it('memoize runs the producer once and replays its journaled value', async () => {
+    const { flow, storage } = createFlow();
+    const produce = vi.fn().mockResolvedValue('nonce');
+
+    expect(await flow.memoize(produce)).toBe('nonce'); // slot 0, runs
+    expect(produce).toHaveBeenCalledOnce();
+    expect(readStored(storage).results).toEqual({ 0: 'nonce' });
+
+    const replay = createFlow({ storage });
+    const produceAgain = vi.fn();
+    expect(await replay.flow.memoize(produceAgain)).toBe('nonce'); // replays
+    expect(produceAgain).not.toHaveBeenCalled();
+  });
+
   it('absorbs a batch return by id and strips the fragment', () => {
     const respA = response(1, { a: 1 });
     const respB = response(2, { b: 2 });
     const storage = createStorage({
       [KEY]: JSON.stringify({
+        createdAt: NOW,
         results: {},
         pending: {
           state: 'S',
@@ -135,12 +160,15 @@ describe('UrlFlow', () => {
 
     expect(flow.get(0)).toEqual(respA);
     expect(flow.get(1)).toEqual(respB);
+    expect(flow.resumable).toBe(true);
     expect(history.replaceState).toHaveBeenCalledWith(null, '', '/signer-callback');
-    expect(readStored(storage)).toEqual({ results: { 0: respA, 1: respB } });
+    expect(readStored(storage).results).toEqual({ 0: respA, 1: respB });
+    expect(readStored(storage).pending).toBeUndefined();
   });
 
   it('ignores a return whose state does not match', () => {
     const seeded = JSON.stringify({
+      createdAt: NOW,
       results: {},
       pending: { state: 'S', requests: [{ index: 0, id: 1 }] },
     });
@@ -155,26 +183,12 @@ describe('UrlFlow', () => {
     expect(storage.getItem(KEY)).toBe(seeded);
   });
 
-  it('memoize runs the producer once and replays its journaled value', async () => {
-    const { flow, storage } = createFlow();
-    const produce = vi.fn().mockResolvedValue('nonce');
-
-    expect(await flow.memoize(produce)).toBe('nonce'); // slot 0, runs
-    expect(produce).toHaveBeenCalledOnce();
-    expect(readStored(storage)).toEqual({ results: { 0: 'nonce' } });
-
-    // A fresh flow over the same storage replays the value without producing.
-    const replay = createFlow({ storage });
-    const produceAgain = vi.fn();
-    expect(await replay.flow.memoize(produceAgain)).toBe('nonce');
-    expect(produceAgain).not.toHaveBeenCalled();
-  });
-
   it('preserves memoized results when absorbing a signer return', () => {
     // Slot 0 is a memoized value; slot 1 is the request awaiting this return.
     const resp = response(9, { ok: true });
     const storage = createStorage({
       [KEY]: JSON.stringify({
+        createdAt: NOW,
         results: { 0: 'nonce' },
         pending: { state: 'S', requests: [{ index: 1, id: 9 }] },
       }),
@@ -184,6 +198,21 @@ describe('UrlFlow', () => {
 
     expect(flow.get(0)).toBe('nonce');
     expect(flow.get(1)).toEqual(resp);
-    expect(readStored(storage)).toEqual({ results: { 0: 'nonce', 1: resp } });
+    expect(readStored(storage).results).toEqual({ 0: 'nonce', 1: resp });
+  });
+
+  it('ignores and clears an expired flow', () => {
+    const storage = createStorage({
+      [KEY]: JSON.stringify({
+        createdAt: NOW,
+        results: { 0: 'nonce' },
+        pending: { state: 'S', requests: [{ index: 1, id: 9 }] },
+      }),
+    });
+    const { flow } = createFlow({ storage, now: () => NOW + 700_000, flowTimeout: 600_000 });
+
+    expect(flow.resumable).toBe(false);
+    expect(flow.get(0)).toBeUndefined();
+    expect(storage.getItem(KEY)).toBeNull();
   });
 });

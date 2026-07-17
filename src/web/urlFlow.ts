@@ -10,12 +10,19 @@ export interface UrlFlowOptions {
   storage: Storage;
   /** Key under which flow state is stored. */
   storageKey: string;
+  /**
+   * Time in milliseconds after which an unfinished flow's persisted state is
+   * considered stale and ignored (a new flow starts instead).
+   */
+  flowTimeout: number;
   /** Location used to read the callback and perform the redirect. */
   location: Pick<Location, 'assign' | 'hash' | 'pathname' | 'search'>;
   /** History used to strip the fragment after reading a response. */
   history: Pick<History, 'replaceState'>;
   /** Source of random UUIDs for the `state` parameter. */
   crypto: Pick<Crypto, 'randomUUID'>;
+  /** Clock used to timestamp flow state and expire it. */
+  now: () => number;
 }
 
 /** A request awaiting a signer return, identified by its call order and id. */
@@ -26,6 +33,7 @@ interface PendingRequest {
 
 /** The persisted journal: results by call order, plus any batch in flight. */
 interface StoredFlow {
+  createdAt?: number;
   results: Record<number, unknown>;
   pending?: { state: string; requests: PendingRequest[] };
 }
@@ -37,7 +45,7 @@ const readStored = (storage: Storage, key: string): StoredFlow => {
   }
   try {
     const parsed = JSON.parse(raw) as StoredFlow;
-    return { results: parsed.results ?? {}, pending: parsed.pending };
+    return { createdAt: parsed.createdAt, results: parsed.results ?? {}, pending: parsed.pending };
   } catch {
     return { results: {} };
   }
@@ -61,17 +69,35 @@ const parseJson = (value: string): unknown => {
  * navigating again. Keeping the counter here — rather than on the channel —
  * means a single unified call order across memoized steps and requests, and
  * survives the signer recreating the channel within a load.
+ *
+ * The journal is stamped with a creation time; once older than the configured
+ * timeout it is treated as absent, so an abandoned flow (and any single-use
+ * value it captured) is not resumed later.
  */
 export class UrlFlow {
   readonly #options: UrlFlowOptions;
   #results: Record<number, unknown>;
   #index = 0;
   #navigated = false;
+  #createdAt?: number;
+  readonly #resumable: boolean;
 
   constructor(options: UrlFlowOptions) {
     this.#options = options;
     const stored = readStored(options.storage, options.storageKey);
+
+    const expired =
+      stored.createdAt !== undefined && options.now() - stored.createdAt > options.flowTimeout;
+    if (expired) {
+      options.storage.removeItem(options.storageKey);
+      this.#results = {};
+      this.#resumable = false;
+      return;
+    }
+
+    this.#createdAt = stored.createdAt;
     this.#results = stored.results;
+    this.#resumable = Object.keys(stored.results).length > 0 || stored.pending !== undefined;
 
     // If this load is a signer return, fold each response of the returned
     // batch into the journal by the index of the request awaiting it.
@@ -94,6 +120,11 @@ export class UrlFlow {
       // Strip the fragment so the response doesn't linger in history or the referrer.
       options.history.replaceState(null, '', options.location.pathname + options.location.search);
     }
+  }
+
+  /** Whether a non-expired flow is in progress and should be resumed. */
+  get resumable(): boolean {
+    return this.#resumable;
   }
 
   /** Reserves the next call-order slot. */
@@ -171,9 +202,10 @@ export class UrlFlow {
   }
 
   #persist(pending?: { state: string; requests: PendingRequest[] }): void {
+    this.#createdAt ??= this.#options.now();
     this.#options.storage.setItem(
       this.#options.storageKey,
-      JSON.stringify({ results: this.#results, pending }),
+      JSON.stringify({ createdAt: this.#createdAt, results: this.#results, pending }),
     );
   }
 }

@@ -23,10 +23,24 @@ export interface UrlTransportOptions {
    */
   storage?: Storage;
   /**
-   * Key under which flow state is persisted.
-   * @default "icrc167:flow"
+   * Key under which flow state is persisted. Defaults to a key derived from
+   * `callbackUrl`, so each flow (which has its own callback) gets its own
+   * journal automatically — set this only to override that namespacing.
+   * @default `icrc167:flow:${callbackUrl}`
    */
   storageKey?: string;
+  /**
+   * Time in milliseconds after which an unfinished flow's persisted state is
+   * considered stale and ignored, so an abandoned flow (and any single-use
+   * value it captured, such as a nonce) is not resumed later.
+   * @default 600000
+   */
+  flowTimeout?: number;
+  /**
+   * Clock used to timestamp and expire flow state.
+   * @default () => Date.now()
+   */
+  now?: () => number;
   /**
    * Location used to read the callback and perform the redirect.
    * @default globalThis.location
@@ -75,6 +89,11 @@ const isSecureContextUrl = (value: string): boolean => {
  * recovered from earlier results), and keep side effects out of that sequence,
  * because it re-executes on each round-trip. Use `hasPendingFlow` to decide
  * whether to resume on load, and `clearFlow` once the flow has fully completed.
+ *
+ * The journal is namespaced by `callbackUrl` by default, so a relying party
+ * with several flows (each with its own callback) gets an isolated journal per
+ * flow without configuring storage keys. An unfinished flow's journal expires
+ * after `flowTimeout`, so an abandoned flow is not resumed later.
  * @see https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_167_browser_url_transport.md
  * @example
  * ```ts
@@ -119,15 +138,17 @@ export class UrlTransport implements Transport {
     }
 
     this.#storage = options.storage ?? globalThis.sessionStorage;
-    this.#storageKey = options.storageKey ?? 'icrc167:flow';
+    this.#storageKey = options.storageKey ?? `icrc167:flow:${options.callbackUrl}`;
     this.#flow = new UrlFlow({
       url: options.url,
       callbackUrl: options.callbackUrl,
       storage: this.#storage,
       storageKey: this.#storageKey,
+      flowTimeout: options.flowTimeout ?? 600000,
       location: options.location ?? globalThis.location,
       history: options.history ?? globalThis.history,
       crypto: options.crypto ?? globalThis.crypto,
+      now: options.now ?? (() => Date.now()),
     });
   }
 
@@ -154,12 +175,12 @@ export class UrlTransport implements Transport {
   }
 
   /**
-   * Whether a flow is in progress and should be resumed on this load. Call it
-   * on page load to decide whether to re-run the calling code that drives the
-   * flow.
+   * Whether a non-expired flow is in progress and should be resumed on this
+   * load. Call it on page load to decide whether to re-run the calling code
+   * that drives the flow.
    */
   hasPendingFlow(): boolean {
-    return this.#storage.getItem(this.#storageKey) !== null;
+    return this.#flow.resumable;
   }
 
   /** Clears persisted flow state. Call once a flow has fully completed. */
