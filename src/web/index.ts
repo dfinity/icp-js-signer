@@ -1,10 +1,5 @@
 export { HeartbeatClient, type HeartbeatClientOptions } from './heartbeat/client.js';
 export { HeartbeatServer, type HeartbeatServerOptions } from './heartbeat/server.js';
-export {
-  readSignerInitiation,
-  type ReadSignerInitiationOptions,
-  type SignerInitiation,
-} from './initiation.js';
 export { PostMessageChannel, type PostMessageChannelOptions } from './postMessageChannel.js';
 export {
   PostMessageTransport,

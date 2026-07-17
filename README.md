@@ -70,7 +70,7 @@ To start such a flow from elsewhere, navigate the browser to its route (a link) 
 
 Requests issued concurrently are coalesced into a single JSON-RPC batch and answered in one round-trip. For example, requesting certified attributes together with a delegation via `Promise.all([signer.delegation(...), signer.accounts(...)])` performs one redirect, not two. Sequential requests — where a later one depends on an earlier response — remain one redirect each.
 
-An async pre-step whose result must stay stable across the redirect — such as fetching a single-use nonce that the signer signs against — must be journaled too, so it runs once and replays afterward rather than being re-fetched on the return load. Use `transport.memoize(callback)`: it runs the callback once (awaiting a promise), records the result in the same call-order journal as requests, and replays it on the return load. It is also the only place a flow may `await` non-request async.
+`transport.memoize(callback)` is how a flow does **any async work other than a signer request** — the sole place it may `await` non-request async. It runs the callback once, records the result in the same call-order journal as requests, and replays that result on the return load instead of re-running. This keeps a value stable across the redirect (e.g. a single-use nonce the signer signs against, which must not be re-fetched on return), whether it's a pre-step or between requests.
 
 ```ts
 // On the flow's route:
@@ -83,19 +83,7 @@ const [attributes, delegation] = await Promise.all([
 finish(nonce, attributes, delegation); // runs once, on completion
 ```
 
-A signer can also start a flow (ICRC-167 signer-initiated interaction). Read it on load with `readSignerInitiation`, then run an ordinary flow — validating the optional `signer` hint against signers you already trust:
-
-```ts
-import { readSignerInitiation } from '@icp-sdk/signer/web';
-
-const initiation = readSignerInitiation();
-if (initiation) {
-  // initiation.hint e.g. "icrc34_delegation"; initiation.signer is only a hint —
-  // validate it against signers you know, then run the flow (the signer calls above).
-  const delegation = await signer.delegation({ publicKey, targets });
-  finish(delegation);
-}
-```
+A signer can start a flow with no extra machinery: visiting a flow's route with no response present is already a fresh start, so a signer initiates simply by navigating the user to that route (a declared callback), and the flow runs as usual.
 
 ### Extension
 

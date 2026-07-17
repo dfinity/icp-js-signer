@@ -161,8 +161,8 @@ export class UrlFlow {
    * The core journaled step: runs `produce` once for its call-order slot and
    * records the result, or returns the recorded result on a replay load
    * without running `produce` again. This is what `UrlTransport.memoize`
-   * exposes for async pre-steps (e.g. fetching a single-use nonce), and it
-   * shares its call-order counter with requests.
+   * exposes for any async work other than a signer request (e.g. fetching a
+   * single-use nonce), and it shares its call-order counter with requests.
    * @param produce - Produces the value on the first load; awaited if a promise.
    * @returns The produced value, or the journaled value on a replay load.
    */

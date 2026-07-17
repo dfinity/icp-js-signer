@@ -151,11 +151,13 @@ export class UrlTransport implements Transport {
   }
 
   /**
-   * Runs `produce` once and journals its result in the same call-order record
-   * as requests, so an async pre-step — such as fetching a single-use nonce —
-   * runs on the first load and replays its result on the return load instead
-   * of re-running. This keeps a value that the signer signed against (e.g. a
-   * certified-attributes nonce) stable across the redirect.
+   * Performs any async work a flow needs other than a signer request — the
+   * sole place a flow may `await` non-request async. It runs `produce` once,
+   * journals its result in the same call-order record as requests, and replays
+   * that result on the return load instead of re-running. This keeps a value
+   * stable across the redirect (e.g. a single-use nonce the signer signs
+   * against, which must not be re-fetched on return), whether it is a pre-step
+   * or falls between requests.
    *
    * `produce` is awaited if it returns a promise. Its result must be
    * JSON-serializable, and it is subject to the same ordering rule as
