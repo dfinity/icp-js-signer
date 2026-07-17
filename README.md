@@ -46,9 +46,9 @@ The [ICRC-167](https://github.com/dfinity/wg-identity-authentication/blob/main/t
 
 The `callbackUrl` must be an absolute URL on an origin you control and be declared in that origin's `/.well-known/ii-auth-callbacks` allow-list.
 
-A relying party typically has several flows (connect, sign, request attributes, …). Give each one its own `callbackUrl` — that is how a return is routed back to the right flow, and each flow automatically gets its own persisted journal (keyed by its callback), so no storage keys need configuring. An unfinished flow's journal expires after `flowTimeout` (default 10 minutes), so an abandoned flow — and any single-use value it captured — is not resumed later.
+A relying party typically has several flows (connect, sign, request attributes, …). Give each one its own **route** and its own `callbackUrl` pointing at that route: a fresh start and the signer's return both land there, so the route's load is where the flow runs. Each callback also namespaces that flow's persisted journal automatically, so no storage keys need configuring. An unfinished flow's journal expires after `flowTimeout` (default 10 minutes), so an abandoned flow — and any single-use value it captured — is not resumed later.
 
-Because a top-level redirect unloads the page, the transport persists completed request results (keyed by call order) and replays them on the return load. Your flow code must therefore run on every load and issue the same sequence of requests in the same order — branch only on values recovered from earlier responses, and keep side effects out of the sequence, since it re-executes on each round-trip.
+Because a top-level redirect unloads the page, the transport persists completed request results (keyed by call order) and replays them on the return load. Run your flow code on the route's load: the first visit starts it, and the signer's return replays it to where it left off. There is no resume or cleanup call — the transport detects completion once the calls settle and clears its own journal. This requires the flow to `await` **nothing but `memoize` and signer requests between calls** (branch only on values recovered from earlier responses); a bare `await` between calls is invisible to the completion detection and breaks the replay.
 
 ```ts
 import { Signer } from '@icp-sdk/signer';
@@ -56,47 +56,44 @@ import { UrlTransport } from '@icp-sdk/signer/web';
 
 const transport = new UrlTransport({
   url: SIGNER_URL,
-  callbackUrl: 'https://relying.example.com/signer-callback',
+  callbackUrl: 'https://relying.example.com/connect', // this flow's route
 });
 const signer = new Signer({ transport });
 
-const connect = async () => {
-  const accounts = await signer.accounts(); // call #0 → redirect, replays on return
-  const delegation = await signer.delegation({ publicKey, targets }); // call #1 → redirect
-  transport.clearFlow();
-  finish(accounts, delegation);
-};
-
-if (transport.hasPendingFlow()) void connect(); // resume mid-flow on load
-connectButton.onclick = () => void connect(); // start
+// Runs on the /connect route's load — fresh visit or signer return:
+const accounts = await signer.accounts(); // redirect; replays on return
+const delegation = await signer.delegation({ publicKey, targets }); // redirect; replays on return
+finish(accounts, delegation); // runs once, on completion
 ```
+
+To start such a flow from elsewhere, navigate the browser to its route (a link) — no method call.
 
 Requests issued concurrently are coalesced into a single JSON-RPC batch and answered in one round-trip. For example, requesting certified attributes together with a delegation via `Promise.all([signer.delegation(...), signer.accounts(...)])` performs one redirect, not two. Sequential requests — where a later one depends on an earlier response — remain one redirect each.
 
-An async pre-step whose result must stay stable across the redirect — such as fetching a single-use nonce that the signer signs against — must be journaled too, so it runs once and replays afterward rather than being re-fetched on the return load. Use `transport.memoize(callback)`: it runs the callback once (awaiting a promise), records the result in the same call-order journal as requests, and replays it on the return load.
+An async pre-step whose result must stay stable across the redirect — such as fetching a single-use nonce that the signer signs against — must be journaled too, so it runs once and replays afterward rather than being re-fetched on the return load. Use `transport.memoize(callback)`: it runs the callback once (awaiting a promise), records the result in the same call-order journal as requests, and replays it on the return load. It is also the only place a flow may `await` non-request async.
 
 ```ts
-const connect = async () => {
-  const nonce = await transport.memoize(() => fetchAttributeNonce()); // fetched once, replayed after
-  const [attributes, delegation] = await Promise.all([
-    // one batched redirect
-    signer.requestAttributes({ nonce }),
-    signer.delegation({ publicKey, targets }),
-  ]);
-  transport.clearFlow();
-  finish(nonce, attributes, delegation);
-};
+// On the flow's route:
+const nonce = await transport.memoize(() => fetchAttributeNonce()); // fetched once, replayed after
+const [attributes, delegation] = await Promise.all([
+  // one batched redirect
+  signer.requestAttributes({ nonce }),
+  signer.delegation({ publicKey, targets }),
+]);
+finish(nonce, attributes, delegation); // runs once, on completion
 ```
 
-A signer can also start a flow (ICRC-167 signer-initiated interaction). Read it on load with `readSignerInitiation`, then begin an ordinary flow — validating the optional `signer` hint against signers you already trust:
+A signer can also start a flow (ICRC-167 signer-initiated interaction). Read it on load with `readSignerInitiation`, then run an ordinary flow — validating the optional `signer` hint against signers you already trust:
 
 ```ts
 import { readSignerInitiation } from '@icp-sdk/signer/web';
 
 const initiation = readSignerInitiation();
 if (initiation) {
-  // initiation.hint e.g. "icrc34_delegation"; initiation.signer is only a hint.
-  void connect();
+  // initiation.hint e.g. "icrc34_delegation"; initiation.signer is only a hint —
+  // validate it against signers you know, then run the flow (the signer calls above).
+  const delegation = await signer.delegation({ publicKey, targets });
+  finish(delegation);
 }
 ```
 

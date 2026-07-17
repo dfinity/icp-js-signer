@@ -92,40 +92,34 @@ describe('UrlTransport', () => {
     });
   });
 
-  describe('flow lifecycle', () => {
-    it('resumes a stored flow, keyed by the callback url', () => {
-      const storage = createStorage({ [KEY]: journal({ 0: 'x' }) });
-      expect(new UrlTransport(options({ storage })).hasPendingFlow()).toBe(true);
-    });
-
-    it('reports no flow when storage is empty', () => {
-      expect(new UrlTransport(options()).hasPendingFlow()).toBe(false);
-    });
-
-    it('does not resume an expired flow, and clears it', () => {
-      const storage = createStorage({ [KEY]: journal({ 0: 'x' }) });
-      const transport = new UrlTransport(
-        options({ storage, now: () => NOW + 999_999, flowTimeout: 1000 }),
-      );
-      expect(transport.hasPendingFlow()).toBe(false);
-      expect(storage.getItem(KEY)).toBeNull();
-    });
-
-    it('clearFlow removes persisted state', () => {
-      const storage = createStorage({ [KEY]: journal({ 0: 'x' }) });
+  describe('flow journal', () => {
+    it('auto-clears when a replayed flow completes without navigating', async () => {
+      const storage = createStorage({ [KEY]: journal({ 0: response(1, { accounts: [] }) }) });
       const transport = new UrlTransport(options({ storage }));
-      transport.clearFlow();
+      const channel = await transport.establishChannel();
+      channel.addEventListener('response', () => {});
+
+      await channel.send({ jsonrpc: '2.0', id: 9, method: 'icrc27_accounts' }); // cached, no miss
+      await microtask();
+      await tick();
+
       expect(storage.getItem(KEY)).toBeNull();
     });
 
-    it('gives distinct callbacks distinct journals', () => {
+    it('namespaces the journal by callback url', async () => {
       const storage = createStorage();
-      // A stored flow for one callback is invisible to a transport for another.
-      storage.setItem(`icrc167:flow:${CALLBACK}/a`, journal({ 0: 'x' }));
-      const forA = new UrlTransport(options({ storage, callbackUrl: `${CALLBACK}/a` }));
-      const forB = new UrlTransport(options({ storage, callbackUrl: `${CALLBACK}/b` }));
-      expect(forA.hasPendingFlow()).toBe(true);
-      expect(forB.hasPendingFlow()).toBe(false);
+      const transport = new UrlTransport(options({ storage, callbackUrl: `${CALLBACK}/a` }));
+
+      await transport.memoize(() => 'x');
+
+      expect(storage.getItem(`icrc167:flow:${CALLBACK}/a`)).not.toBeNull();
+      expect(storage.getItem(`icrc167:flow:${CALLBACK}/b`)).toBeNull();
+    });
+
+    it('does not resume an expired flow, and clears it on construction', () => {
+      const storage = createStorage({ [KEY]: journal({ 0: 'x' }) });
+      new UrlTransport(options({ storage, now: () => NOW + 999_999, flowTimeout: 1000 }));
+      expect(storage.getItem(KEY)).toBeNull();
     });
   });
 
@@ -172,12 +166,14 @@ describe('UrlTransport', () => {
       const delegation = response(2, { signerDelegation: ['chain'] });
 
       // Load 1: memoize the nonce, then issue two requests concurrently.
-      const transport1 = new UrlTransport(options({ storage, location: createLocation() }));
+      const location1 = createLocation();
+      const transport1 = new UrlTransport(options({ storage, location: location1 }));
       expect(await transport1.memoize(fetchNonce)).toBe('nonce-123'); // slot 0 → fetches
       const channel1 = await transport1.establishChannel();
       await channel1.send({ jsonrpc: '2.0', id: 1, method: 'icrc_attributes' }); // slot 1
       await channel1.send({ jsonrpc: '2.0', id: 2, method: 'icrc34_delegation' }); // slot 2
       await tick();
+      expect(location1.assign).toHaveBeenCalledOnce();
 
       // Load 2: signer returns the batch; nonce replays, responses replay.
       const location2 = createLocation(
@@ -193,12 +189,14 @@ describe('UrlTransport', () => {
       await channel2.send({ jsonrpc: '2.0', id: 10, method: 'icrc_attributes' }); // slot 1 cached
       await channel2.send({ jsonrpc: '2.0', id: 11, method: 'icrc34_delegation' }); // slot 2 cached
       await microtask();
+      await tick();
 
       expect(location2.assign).not.toHaveBeenCalled();
       expect(got).toEqual([
         { ...attributes, id: 10 },
         { ...delegation, id: 11 },
       ]);
+      expect(storage.getItem(KEY)).toBeNull(); // completed flow auto-cleared
     });
   });
 });

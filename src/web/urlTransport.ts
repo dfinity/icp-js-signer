@@ -84,11 +84,14 @@ const isSecureContextUrl = (value: string): boolean => {
  * as `const x = await a(); const y = await b(x)` continues where it left off
  * across the redirect.
  *
- * The calling code must run on every load and issue the same sequence of
- * requests and `memoize` steps in the same order (branch only on values
- * recovered from earlier results), and keep side effects out of that sequence,
- * because it re-executes on each round-trip. Use `hasPendingFlow` to decide
- * whether to resume on load, and `clearFlow` once the flow has fully completed.
+ * Run the calling code on the load of the flow's route: a fresh arrival and
+ * the signer's return both land there, so re-running it starts the flow the
+ * first time and replays it on the return. No resume or cleanup call is
+ * needed — the flow detects completion once the calls settle and clears its
+ * own journal. This requires the calling code to await **nothing but `memoize`
+ * and signer requests between calls** (branch only on values recovered from
+ * earlier results); a bare `await` between calls is invisible to the completion
+ * detection and breaks the replay. See {@link UrlFlow}.
  *
  * The journal is namespaced by `callbackUrl` by default, so a relying party
  * with several flows (each with its own callback) gets an isolated journal per
@@ -103,25 +106,17 @@ const isSecureContextUrl = (value: string): boolean => {
  * });
  * const signer = new Signer({ transport });
  *
- * const connect = async () => {
- *   // Async pre-step, journaled so it runs once and replays across redirects.
- *   const nonce = await transport.memoize(() => fetchAttributeNonce());
- *   const [attributes, delegation] = await Promise.all([
- *     signer.requestAttributes({ nonce }),
- *     signer.delegation({ publicKey, targets }),
- *   ]);
- *   transport.clearFlow();
- *   finish(nonce, attributes, delegation);
- * };
- *
- * if (transport.hasPendingFlow()) void connect();       // resume on load
- * connectButton.onclick = () => void connect();         // start
+ * // On the load of the callback route (fresh arrival or signer return):
+ * const nonce = await transport.memoize(() => fetchAttributeNonce());
+ * const [attributes, delegation] = await Promise.all([
+ *   signer.requestAttributes({ nonce }),
+ *   signer.delegation({ publicKey, targets }),
+ * ]);
+ * finish(nonce, attributes, delegation); // runs once, on completion
  * ```
  */
 export class UrlTransport implements Transport {
   readonly #flow: UrlFlow;
-  readonly #storage: Storage;
-  readonly #storageKey: string;
 
   constructor(options: UrlTransportOptions) {
     if (!isSecureContextUrl(options.url)) {
@@ -137,13 +132,11 @@ export class UrlTransport implements Transport {
       throw new UrlTransportError('Callback url must not contain a fragment');
     }
 
-    this.#storage = options.storage ?? globalThis.sessionStorage;
-    this.#storageKey = options.storageKey ?? `icrc167:flow:${options.callbackUrl}`;
     this.#flow = new UrlFlow({
       url: options.url,
       callbackUrl: options.callbackUrl,
-      storage: this.#storage,
-      storageKey: this.#storageKey,
+      storage: options.storage ?? globalThis.sessionStorage,
+      storageKey: options.storageKey ?? `icrc167:flow:${options.callbackUrl}`,
       flowTimeout: options.flowTimeout ?? 600000,
       location: options.location ?? globalThis.location,
       history: options.history ?? globalThis.history,
@@ -172,19 +165,5 @@ export class UrlTransport implements Transport {
    */
   memoize<T>(produce: () => T | Promise<T>): Promise<T> {
     return this.#flow.memoize(produce);
-  }
-
-  /**
-   * Whether a non-expired flow is in progress and should be resumed on this
-   * load. Call it on page load to decide whether to re-run the calling code
-   * that drives the flow.
-   */
-  hasPendingFlow(): boolean {
-    return this.#flow.resumable;
-  }
-
-  /** Clears persisted flow state. Call once a flow has fully completed. */
-  clearFlow(): void {
-    this.#storage.removeItem(this.#storageKey);
   }
 }

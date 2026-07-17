@@ -60,80 +60,100 @@ const createFlow = (
   return { flow, storage, location, history };
 };
 
+const tick = () => new Promise<void>(resolve => setTimeout(resolve, 0));
 const response = (id: string | number, result: unknown): JsonRpcResponse => ({
   jsonrpc: '2.0',
   id,
   result,
 });
-
 const hashFor = (params: Record<string, string>) => `#${new URLSearchParams(params).toString()}`;
 const readStored = (storage: Storage) => JSON.parse(storage.getItem(KEY) ?? 'null');
 const assignedFragment = (location: MockLocation) =>
   new URLSearchParams(new URL(location.assign.mock.calls[0][0]).hash.slice(1));
+const request = (id: number, method: string) => ({ jsonrpc: '2.0' as const, id, method });
 
 describe('UrlFlow', () => {
   it('hands out sequential call-order slots', () => {
     const { flow } = createFlow();
     expect(flow.next()).toBe(0);
     expect(flow.next()).toBe(1);
-    expect(flow.next()).toBe(2);
   });
 
-  it('is not resumable without a stored flow', () => {
-    expect(createFlow().flow.resumable).toBe(false);
-  });
-
-  it('records a value, persists it, and stamps createdAt', () => {
-    const { flow, storage } = createFlow();
-    flow.record(flow.next(), 'nonce');
-    expect(flow.get(0)).toBe('nonce');
-    expect(readStored(storage).results).toEqual({ 0: 'nonce' });
-    expect(readStored(storage).createdAt).toBe(NOW);
-  });
-
-  it('navigates a single request with message, callback and state', () => {
+  it('navigates a single buffered request after settling', async () => {
     const { flow, location, storage } = createFlow({ states: ['S'] });
-    const request = { jsonrpc: '2.0' as const, id: 1, method: 'icrc27_accounts' };
-    flow.navigate([{ index: 0, request }]);
+    flow.request(flow.next(), request(1, 'icrc27_accounts'));
+    expect(location.assign).not.toHaveBeenCalled(); // deferred to settle
+    await tick();
 
     expect(location.assign).toHaveBeenCalledOnce();
     const params = assignedFragment(location);
-    expect(JSON.parse(params.get('message') ?? '')).toEqual(request);
+    expect(JSON.parse(params.get('message') ?? '')).toEqual(request(1, 'icrc27_accounts'));
     expect(params.get('callback')).toBe(CALLBACK);
     expect(params.get('state')).toBe('S');
     expect(readStored(storage).pending).toEqual({ state: 'S', requests: [{ index: 0, id: 1 }] });
   });
 
-  it('navigates concurrent requests as one JSON-RPC batch', () => {
+  it('coalesces concurrently buffered requests into one batch navigation', async () => {
     const { flow, location } = createFlow({ states: ['S'] });
-    const a = { jsonrpc: '2.0' as const, id: 1, method: 'a' };
-    const b = { jsonrpc: '2.0' as const, id: 2, method: 'b' };
-    flow.navigate([
-      { index: 0, request: a },
-      { index: 1, request: b },
-    ]);
+    const a = request(1, 'icrc34_delegation');
+    const b = request(2, 'icrc27_accounts');
+    flow.request(flow.next(), a);
+    flow.request(flow.next(), b);
+    await tick();
+
+    expect(location.assign).toHaveBeenCalledOnce();
     expect(JSON.parse(assignedFragment(location).get('message') ?? '')).toEqual([a, b]);
   });
 
-  it('navigates at most once', () => {
+  it('navigates at most once per load', async () => {
     const { flow, location } = createFlow({ states: ['S', 'S2'] });
-    flow.navigate([{ index: 0, request: { jsonrpc: '2.0', id: 1, method: 'a' } }]);
-    flow.navigate([{ index: 1, request: { jsonrpc: '2.0', id: 2, method: 'b' } }]);
+    flow.request(flow.next(), request(1, 'a'));
+    await tick();
+    flow.request(flow.next(), request(2, 'b'));
+    await tick();
     expect(location.assign).toHaveBeenCalledOnce();
-    expect(flow.navigated).toBe(true);
+  });
+
+  it('clears the journal once the flow settles without navigating', async () => {
+    const storage = createStorage({
+      [KEY]: JSON.stringify({ createdAt: NOW, results: { 0: response(1, {}) } }),
+    });
+    const { flow } = createFlow({ storage });
+    flow.touch(); // a replayed cached call; nothing navigates
+    await tick();
+    expect(storage.getItem(KEY)).toBeNull();
+  });
+
+  it('holds off navigation until an in-flight memoize is recorded', async () => {
+    const { flow, location, storage } = createFlow({ states: ['S'] });
+    let resolveNonce!: (value: string) => void;
+    const nonceDone = flow.memoize(() => new Promise<string>(r => (resolveNonce = r))); // slot 0
+    flow.request(flow.next(), request(1, 'icrc34_delegation')); // slot 1, buffered
+
+    await tick();
+    expect(location.assign).not.toHaveBeenCalled(); // held off by the in-flight memoize
+
+    resolveNonce('nonce');
+    await nonceDone;
+    await tick();
+
+    expect(location.assign).toHaveBeenCalledOnce();
+    const stored = readStored(storage);
+    expect(stored.results).toEqual({ 0: 'nonce' }); // recorded before the redirect
+    expect(stored.pending.requests).toEqual([{ index: 1, id: 1 }]);
   });
 
   it('memoize runs the producer once and replays its journaled value', async () => {
     const { flow, storage } = createFlow();
     const produce = vi.fn().mockResolvedValue('nonce');
 
-    expect(await flow.memoize(produce)).toBe('nonce'); // slot 0, runs
+    expect(await flow.memoize(produce)).toBe('nonce');
     expect(produce).toHaveBeenCalledOnce();
     expect(readStored(storage).results).toEqual({ 0: 'nonce' });
 
     const replay = createFlow({ storage });
     const produceAgain = vi.fn();
-    expect(await replay.flow.memoize(produceAgain)).toBe('nonce'); // replays
+    expect(await replay.flow.memoize(produceAgain)).toBe('nonce');
     expect(produceAgain).not.toHaveBeenCalled();
   });
 
@@ -160,7 +180,6 @@ describe('UrlFlow', () => {
 
     expect(flow.get(0)).toEqual(respA);
     expect(flow.get(1)).toEqual(respB);
-    expect(flow.resumable).toBe(true);
     expect(history.replaceState).toHaveBeenCalledWith(null, '', '/signer-callback');
     expect(readStored(storage).results).toEqual({ 0: respA, 1: respB });
     expect(readStored(storage).pending).toBeUndefined();
@@ -184,7 +203,6 @@ describe('UrlFlow', () => {
   });
 
   it('preserves memoized results when absorbing a signer return', () => {
-    // Slot 0 is a memoized value; slot 1 is the request awaiting this return.
     const resp = response(9, { ok: true });
     const storage = createStorage({
       [KEY]: JSON.stringify({
@@ -211,7 +229,6 @@ describe('UrlFlow', () => {
     });
     const { flow } = createFlow({ storage, now: () => NOW + 700_000, flowTimeout: 600_000 });
 
-    expect(flow.resumable).toBe(false);
     expect(flow.get(0)).toBeUndefined();
     expect(storage.getItem(KEY)).toBeNull();
   });

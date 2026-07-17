@@ -66,13 +66,20 @@ const parseJson = (value: string): unknown => {
  * signer requests, and persisted across the top-level redirect. On the return
  * load the calling code re-runs; each memoized step and each request that has
  * already completed resolves from this journal instead of running or
- * navigating again. Keeping the counter here — rather than on the channel —
- * means a single unified call order across memoized steps and requests, and
- * survives the signer recreating the channel within a load.
+ * navigating again, so `const x = await a(); const y = await b(x)` replays to
+ * where it left off. Concurrently issued requests are coalesced into one
+ * JSON-RPC batch and one redirect.
  *
- * The journal is stamped with a creation time; once older than the configured
- * timeout it is treated as absent, so an abandoned flow (and any single-use
- * value it captured) is not resumed later.
+ * Completion is detected by quiescence: the flow reschedules a settle task on
+ * every call, and once the calls have settled it either navigates the batch
+ * (if any request missed) or, if nothing navigated, clears the journal (the
+ * flow ran to the end). This is only sound when the calling code awaits
+ * **nothing but `memoize` and signer requests between calls** — an in-flight
+ * `memoize` producer holds settle off (so it can't fire mid-fetch, and so a
+ * concurrent memoized value is recorded before any redirect), but a bare
+ * `await` the flow makes on its own is invisible here and would let settle
+ * fire in the gap. The `flowTimeout` stamp is a backstop: a journal older than
+ * the timeout is treated as absent, so an abandoned flow is not resumed later.
  */
 export class UrlFlow {
   readonly #options: UrlFlowOptions;
@@ -80,7 +87,9 @@ export class UrlFlow {
   #index = 0;
   #navigated = false;
   #createdAt?: number;
-  readonly #resumable: boolean;
+  #buffer: { index: number; request: JsonRpcRequest }[] = [];
+  #inFlight = 0;
+  #settleTimer?: ReturnType<typeof setTimeout>;
 
   constructor(options: UrlFlowOptions) {
     this.#options = options;
@@ -91,13 +100,11 @@ export class UrlFlow {
     if (expired) {
       options.storage.removeItem(options.storageKey);
       this.#results = {};
-      this.#resumable = false;
       return;
     }
 
     this.#createdAt = stored.createdAt;
     this.#results = stored.results;
-    this.#resumable = Object.keys(stored.results).length > 0 || stored.pending !== undefined;
 
     // If this load is a signer return, fold each response of the returned
     // batch into the journal by the index of the request awaiting it.
@@ -122,11 +129,6 @@ export class UrlFlow {
     }
   }
 
-  /** Whether a non-expired flow is in progress and should be resumed. */
-  get resumable(): boolean {
-    return this.#resumable;
-  }
-
   /** Reserves the next call-order slot. */
   next(): number {
     return this.#index++;
@@ -140,14 +142,19 @@ export class UrlFlow {
     return this.#results[index];
   }
 
+  /** Marks flow activity (a replayed call), rescheduling the settle task. */
+  touch(): void {
+    this.#scheduleSettle();
+  }
+
   /**
-   * Records a completed non-navigating result (e.g. a memoized value).
-   * @param index - The call-order slot to write.
-   * @param value - The value to store; must be JSON-serializable.
+   * Buffers an uncached request for the next redirect and marks activity.
+   * @param index - The call-order slot reserved for the request.
+   * @param request - The JSON-RPC request to send on the next redirect.
    */
-  record(index: number, value: unknown): void {
-    this.#results[index] = value;
-    this.#persist();
+  request(index: number, request: JsonRpcRequest): void {
+    this.#buffer.push({ index, request });
+    this.#scheduleSettle();
   }
 
   /**
@@ -163,28 +170,52 @@ export class UrlFlow {
     const index = this.next();
     const cached = this.get(index);
     if (cached !== undefined) {
+      this.#scheduleSettle();
       return cached as T;
     }
-    const value = await produce();
-    this.record(index, value);
-    return value;
+    this.#inFlight++;
+    try {
+      const value = await produce();
+      this.#results[index] = value;
+      this.#persist();
+      return value;
+    } finally {
+      this.#inFlight--;
+      this.#scheduleSettle();
+    }
   }
 
-  /** Whether a redirect has already been initiated on this load. */
-  get navigated(): boolean {
-    return this.#navigated;
+  #scheduleSettle(): void {
+    if (this.#settleTimer !== undefined) {
+      clearTimeout(this.#settleTimer);
+    }
+    this.#settleTimer = setTimeout(() => this.#settle(), 0);
   }
 
-  /**
-   * Persists the batch as pending and navigates the browser to the signer.
-   * @param batch - The buffered requests, each with its reserved call-order slot.
-   */
-  navigate(batch: { index: number; request: JsonRpcRequest }[]): void {
-    if (this.#navigated || batch.length === 0) {
+  #settle(): void {
+    this.#settleTimer = undefined;
+    // A memoize producer is still running; it reschedules settle on resolve.
+    if (this.#inFlight > 0) {
+      return;
+    }
+    if (this.#buffer.length > 0) {
+      this.#navigate();
+      return;
+    }
+    // No request missed and nothing navigated: the flow ran to completion.
+    if (!this.#navigated) {
+      this.#options.storage.removeItem(this.#options.storageKey);
+    }
+  }
+
+  #navigate(): void {
+    if (this.#navigated) {
       return;
     }
     this.#navigated = true;
 
+    const batch = this.#buffer;
+    this.#buffer = [];
     const state = this.#options.crypto.randomUUID();
     this.#persist({
       state,
