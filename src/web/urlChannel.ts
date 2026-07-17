@@ -23,12 +23,18 @@ export interface UrlChannelOptions {
   crypto: Pick<Crypto, 'randomUUID'>;
 }
 
-/** The completed calls of a flow, plus the one call awaiting a signer return. */
+/** A request awaiting a signer return, identified by its call order and id. */
+interface PendingRequest {
+  index: number;
+  id: string | number | null;
+}
+
+/** The completed calls of a flow, plus the batch awaiting a signer return. */
 interface StoredFlow {
   /** Responses of completed calls, keyed by call order. */
   results: Record<number, JsonRpcResponse>;
-  /** The call currently awaiting a return, if the browser is at the signer. */
-  pending?: { index: number; state: string };
+  /** The requests sent in the current redirect, if the browser is at the signer. */
+  pending?: { state: string; requests: PendingRequest[] };
 }
 
 const readFlow = (storage: Storage, key: string): StoredFlow => {
@@ -44,6 +50,14 @@ const readFlow = (storage: Storage, key: string): StoredFlow => {
   }
 };
 
+const parseJson = (value: string): unknown => {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return undefined;
+  }
+};
+
 /**
  * A {@link Channel} implementation for the ICRC-167 browser URL transport.
  *
@@ -56,10 +70,17 @@ const readFlow = (storage: Storage, key: string): StoredFlow => {
  * already-completed calls resolve from storage instead of navigating again,
  * so `const x = await a(); const y = await b(x)` replays to where it left off.
  *
- * The calling code must therefore issue the same sequence of requests, in the
- * same order, on every load (branch only on values recovered from earlier
- * responses), and keep side effects out of that sequence — it re-executes on
- * each round-trip. See the module README for the full replay contract.
+ * Requests issued concurrently — e.g. `Promise.all([signer.delegation(...),
+ * signer.accounts(...)])` — arrive before the page navigates. They are
+ * coalesced into a single JSON-RPC batch and answered in one round-trip
+ * instead of one redirect per request. Sequential requests, where a later one
+ * cannot be issued until an earlier `await` resolves, remain one per redirect.
+ *
+ * The calling code must run on every load and issue the same sequence of
+ * requests in the same order (branch only on values recovered from earlier
+ * responses), and keep side effects out of that sequence, because it
+ * re-executes on each round-trip. See the module README for the full replay
+ * contract.
  * @see https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_167_browser_url_transport.md
  */
 export class UrlChannel implements Channel {
@@ -69,32 +90,35 @@ export class UrlChannel implements Channel {
   #results: Record<number, JsonRpcResponse>;
   #index = 0;
   #closed = false;
-  #navigating = false;
+  #buffer: { index: number; request: JsonRpcRequest }[] = [];
+  #flushHandle?: ReturnType<typeof setTimeout>;
+  #navigated = false;
 
   constructor(options: UrlChannelOptions) {
     this.#options = options;
     const flow = readFlow(options.storage, options.storageKey);
     this.#results = flow.results;
 
-    // If this load is a signer return, fold its response into the results by
-    // the index of the call that was awaiting it.
+    // If this load is a signer return, fold each response of the returned
+    // batch into the results by the index of the call that was awaiting it.
     const params = new URLSearchParams(options.location.hash.slice(1));
     const message = params.get('message');
     const state = params.get('state');
     if (message !== null && flow.pending !== undefined && state === flow.pending.state) {
-      const response: unknown = ((): unknown => {
-        try {
-          return JSON.parse(message);
-        } catch {
-          return undefined;
+      const parsed = parseJson(message);
+      const responses = Array.isArray(parsed) ? parsed : [parsed];
+      for (const { index, id } of flow.pending.requests) {
+        const match = responses.find(
+          (response): response is JsonRpcResponse =>
+            isJsonRpcResponse(response) && response.id === id,
+        );
+        if (match !== undefined) {
+          this.#results = { ...this.#results, [index]: match };
         }
-      })();
-      if (isJsonRpcResponse(response)) {
-        this.#results = { ...this.#results, [flow.pending.index]: response };
-        options.storage.setItem(options.storageKey, JSON.stringify({ results: this.#results }));
       }
+      options.storage.setItem(options.storageKey, JSON.stringify({ results: this.#results }));
       // Strip the fragment so the response doesn't linger in history or the
-      // referrer, whether or not it parsed.
+      // referrer.
       options.history.replaceState(null, '', options.location.pathname + options.location.search);
     }
   }
@@ -125,10 +149,12 @@ export class UrlChannel implements Channel {
 
   /**
    * Resolves the request from a stored result if the flow has already reached
-   * this call, otherwise persists progress and navigates the browser to the
-   * signer. In the latter case the page unloads, so the caller's awaited
-   * response never arrives on this load — it arrives on the return load, when
-   * the calling code replays this same request and it resolves from storage.
+   * this call, otherwise buffers it for the next redirect. Requests buffered
+   * before the redirect fires (issued concurrently) are sent together as one
+   * JSON-RPC batch. When the redirect fires the page unloads, so the caller's
+   * awaited response never arrives on this load — it arrives on the return
+   * load, when the calling code replays this same request and it resolves from
+   * storage.
    * @param request - The JSON-RPC request to send.
    */
   send(request: JsonRpcRequest): Promise<void> {
@@ -150,25 +176,43 @@ export class UrlChannel implements Channel {
       return Promise.resolve();
     }
 
-    // Only one redirect can happen per load; a concurrent second uncached
-    // request is left for the next load rather than clobbering this one.
-    if (this.#navigating) {
-      return Promise.resolve();
-    }
-    this.#navigating = true;
+    // Buffer the request and flush on the next macrotask, so concurrently
+    // issued requests (already queued as microtasks) are all collected first
+    // and sent as a single batch.
+    this.#buffer.push({ index, request });
+    this.#flushHandle ??= setTimeout(() => this.#flush(), 0);
+    return Promise.resolve();
+  }
 
+  #flush(): void {
+    this.#flushHandle = undefined;
+    if (this.#closed || this.#navigated || this.#buffer.length === 0) {
+      return;
+    }
+    this.#navigated = true;
+
+    const buffered = this.#buffer;
+    this.#buffer = [];
     const state = this.#options.crypto.randomUUID();
     this.#options.storage.setItem(
       this.#options.storageKey,
-      JSON.stringify({ results: this.#results, pending: { index, state } }),
+      JSON.stringify({
+        results: this.#results,
+        pending: {
+          state,
+          requests: buffered.map(({ index, request }) => ({ index, id: request.id ?? null })),
+        },
+      }),
     );
+
+    const requests = buffered.map(({ request }) => request);
+    const message = JSON.stringify(requests.length === 1 ? requests[0] : requests);
     const fragment = new URLSearchParams({
-      message: JSON.stringify(request),
+      message,
       callback: this.#options.callbackUrl,
       state,
     });
     this.#options.location.assign(`${this.#options.url}#${fragment.toString()}`);
-    return Promise.resolve();
   }
 
   /** Marks the channel closed and notifies all close listeners. */
@@ -177,6 +221,10 @@ export class UrlChannel implements Channel {
       return Promise.resolve();
     }
     this.#closed = true;
+    if (this.#flushHandle !== undefined) {
+      clearTimeout(this.#flushHandle);
+      this.#flushHandle = undefined;
+    }
     for (const listener of this.#closeListeners) {
       listener();
     }

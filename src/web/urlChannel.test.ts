@@ -58,7 +58,10 @@ const createChannel = (
   return { channel, storage, location, history };
 };
 
-const flush = () => new Promise<void>(resolve => queueMicrotask(resolve));
+// Lets buffered microtask emissions run.
+const microtask = () => new Promise<void>(resolve => queueMicrotask(resolve));
+// Lets the deferred navigation flush (a macrotask) run.
+const tick = () => new Promise<void>(resolve => setTimeout(resolve, 0));
 
 const hashFor = (params: Record<string, string>) => `#${new URLSearchParams(params).toString()}`;
 
@@ -68,25 +71,25 @@ const response = (id: string | number, result: unknown): JsonRpcResponse => ({
   result,
 });
 
-// Reads a fragment parameter from the URL passed to the last `location.assign`.
-const assignedParam = (location: MockLocation, name: string): string => {
-  const [url] = location.assign.mock.calls[location.assign.mock.calls.length - 1];
-  const value = new URLSearchParams(new URL(url).hash.slice(1)).get(name);
-  if (value === null) {
-    throw new Error(`assigned url has no "${name}" fragment param`);
-  }
-  return value;
+// Reads the fragment params of the URL passed to the last `location.assign`.
+const assignedFragment = (location: MockLocation): URLSearchParams => {
+  const calls = location.assign.mock.calls;
+  const [url] = calls[calls.length - 1];
+  return new URLSearchParams(new URL(url).hash.slice(1));
 };
 
-const readStored = (
-  storage: Storage,
-): { results: Record<number, JsonRpcResponse>; pending?: unknown } => {
+const readStored = (storage: Storage): StoredFlowShape => {
   const raw = storage.getItem(STORAGE_KEY);
   if (raw === null) {
     throw new Error('no flow stored');
   }
   return JSON.parse(raw);
 };
+
+interface StoredFlowShape {
+  results: Record<number, JsonRpcResponse>;
+  pending?: { state: string; requests: { index: number; id: string | number | null }[] };
+}
 
 describe('UrlChannel', () => {
   describe('send', () => {
@@ -95,17 +98,20 @@ describe('UrlChannel', () => {
       const request = { jsonrpc: '2.0' as const, id: 1, method: 'icrc27_accounts' };
 
       await channel.send(request);
+      await tick();
 
       expect(location.assign).toHaveBeenCalledOnce();
-      const [assigned] = location.assign.mock.calls[0];
-      const url = new URL(assigned);
+      const url = new URL(location.assign.mock.calls[0][0]);
       expect(`${url.origin}${url.pathname}`).toBe(URL_);
-      const params = new URLSearchParams(url.hash.slice(1));
-      expect(JSON.parse(assignedParam(location, 'message'))).toEqual(request);
+      const params = assignedFragment(location);
+      expect(JSON.parse(params.get('message') ?? '')).toEqual(request);
       expect(params.get('callback')).toBe(CALLBACK);
       expect(params.get('state')).toBe('state-0');
 
-      expect(readStored(storage).pending).toEqual({ index: 0, state: 'state-0' });
+      expect(readStored(storage).pending).toEqual({
+        state: 'state-0',
+        requests: [{ index: 0, id: 1 }],
+      });
     });
 
     it('replays a completed call from storage without navigating', async () => {
@@ -116,7 +122,8 @@ describe('UrlChannel', () => {
       channel.addEventListener('response', listener);
 
       await channel.send({ jsonrpc: '2.0', id: 7, method: 'icrc27_accounts' });
-      await flush();
+      await microtask();
+      await tick();
 
       expect(location.assign).not.toHaveBeenCalled();
       // Response is re-stamped with the id used for THIS call.
@@ -128,12 +135,63 @@ describe('UrlChannel', () => {
       await channel.close();
       await expect(channel.send({ jsonrpc: '2.0', id: 1, method: 'x' })).rejects.toThrow();
     });
+  });
 
-    it('does not navigate twice within one load', async () => {
-      const { channel, location } = createChannel();
-      await channel.send({ jsonrpc: '2.0', id: 1, method: 'a' });
-      await channel.send({ jsonrpc: '2.0', id: 2, method: 'b' });
+  describe('batching concurrent requests', () => {
+    it('coalesces requests issued before the redirect into one navigation', async () => {
+      const { channel, location, storage } = createChannel({ states: ['batch-state'] });
+      const reqA = { jsonrpc: '2.0' as const, id: 1, method: 'icrc34_delegation' };
+      const reqB = { jsonrpc: '2.0' as const, id: 2, method: 'icrc27_accounts' };
+
+      // Issued together (as with Promise.all) — both buffer before the flush.
+      await channel.send(reqA);
+      await channel.send(reqB);
+      await tick();
+
       expect(location.assign).toHaveBeenCalledOnce();
+      expect(JSON.parse(assignedFragment(location).get('message') ?? '')).toEqual([reqA, reqB]);
+      expect(readStored(storage).pending).toEqual({
+        state: 'batch-state',
+        requests: [
+          { index: 0, id: 1 },
+          { index: 1, id: 2 },
+        ],
+      });
+    });
+
+    it('absorbs a batch return and replays each response by its id', async () => {
+      const respA = response(1, { signerDelegation: ['chain'] });
+      const respB = response(2, { accounts: ['acc'] });
+      const storage = createStorage({
+        [STORAGE_KEY]: JSON.stringify({
+          results: {},
+          pending: {
+            state: 'batch-state',
+            requests: [
+              { index: 0, id: 1 },
+              { index: 1, id: 2 },
+            ],
+          },
+        }),
+      });
+      const location = createLocation(
+        hashFor({ message: JSON.stringify([respA, respB]), state: 'batch-state' }),
+      );
+      const { channel, history } = createChannel({ storage, location });
+
+      expect(history.replaceState).toHaveBeenCalledWith(null, '', '/signer-callback');
+      expect(readStored(storage)).toEqual({ results: { 0: respA, 1: respB } });
+
+      const responses: JsonRpcResponse[] = [];
+      channel.addEventListener('response', r => responses.push(r));
+      await channel.send({ jsonrpc: '2.0', id: 10, method: 'icrc34_delegation' }); // #0 cached
+      await channel.send({ jsonrpc: '2.0', id: 11, method: 'icrc27_accounts' }); // #1 cached
+      await microtask();
+
+      expect(responses).toEqual([
+        { ...respA, id: 10 },
+        { ...respB, id: 11 },
+      ]);
     });
   });
 
@@ -141,27 +199,30 @@ describe('UrlChannel', () => {
     it('folds a matching signer return into results and strips the fragment', async () => {
       const resp = response('req-id', { accounts: ['a'] });
       const storage = createStorage({
-        [STORAGE_KEY]: JSON.stringify({ results: {}, pending: { index: 0, state: 'state-0' } }),
+        [STORAGE_KEY]: JSON.stringify({
+          results: {},
+          pending: { state: 'state-0', requests: [{ index: 0, id: 'req-id' }] },
+        }),
       });
       const location = createLocation(hashFor({ message: JSON.stringify(resp), state: 'state-0' }));
       const { channel, history } = createChannel({ storage, location });
 
       expect(history.replaceState).toHaveBeenCalledWith(null, '', '/signer-callback');
-      const stored = readStored(storage);
-      expect(stored).toEqual({ results: { 0: resp } });
-      expect(stored.pending).toBeUndefined();
+      expect(readStored(storage)).toEqual({ results: { 0: resp } });
 
-      // The absorbed result now replays for call index 0.
       const listener = vi.fn();
       channel.addEventListener('response', listener);
       await channel.send({ jsonrpc: '2.0', id: 42, method: 'icrc27_accounts' });
-      await flush();
+      await microtask();
       expect(listener).toHaveBeenCalledWith({ ...resp, id: 42 });
     });
 
     it('ignores a return whose state does not match the pending state', () => {
       const resp = response('req-id', { accounts: [] });
-      const seeded = JSON.stringify({ results: {}, pending: { index: 0, state: 'state-0' } });
+      const seeded = JSON.stringify({
+        results: {},
+        pending: { state: 'state-0', requests: [{ index: 0, id: 'req-id' }] },
+      });
       const storage = createStorage({ [STORAGE_KEY]: seeded });
       const location = createLocation(hashFor({ message: JSON.stringify(resp), state: 'wrong' }));
       const { history } = createChannel({ storage, location });
@@ -185,15 +246,18 @@ describe('UrlChannel', () => {
   describe('sequential flow across redirects', () => {
     it('replays "const x = await a(); const y = await b(x)" to completion', async () => {
       const storage = createStorage();
-      const respA = response('a', { accounts: ['acc'] });
-      const respB = response('b', { signerDelegation: ['chain'] });
+      // The signer echoes the request id, so the response id matches the id of
+      // the outbound request that triggered each redirect (1, then 11).
+      const respA = response(1, { accounts: ['acc'] });
+      const respB = response(11, { signerDelegation: ['chain'] });
 
       // Load 1 — fresh start: a() navigates.
       const location1 = createLocation();
       const { channel: channel1 } = createChannel({ storage, location: location1, states: ['S0'] });
       await channel1.send({ jsonrpc: '2.0', id: 1, method: 'icrc27_accounts' });
+      await tick();
       expect(location1.assign).toHaveBeenCalledOnce();
-      expect(assignedParam(location1, 'state')).toBe('S0');
+      expect(assignedFragment(location1).get('state')).toBe('S0');
 
       // Load 2 — signer returns respA; a() replays, b() navigates.
       const location2 = createLocation(hashFor({ message: JSON.stringify(respA), state: 'S0' }));
@@ -201,23 +265,26 @@ describe('UrlChannel', () => {
       const responses2: JsonRpcResponse[] = [];
       channel2.addEventListener('response', r => responses2.push(r));
       await channel2.send({ jsonrpc: '2.0', id: 10, method: 'icrc27_accounts' }); // #0 cached
-      await flush();
+      await microtask();
       await channel2.send({ jsonrpc: '2.0', id: 11, method: 'icrc34_delegation' }); // #1 navigate
-      await flush();
+      await tick();
       expect(responses2).toEqual([{ ...respA, id: 10 }]);
       expect(location2.assign).toHaveBeenCalledOnce();
-      const stateB = assignedParam(location2, 'state');
+      const stateB = assignedFragment(location2).get('state');
       expect(stateB).toBe('S1');
 
       // Load 3 — signer returns respB; both calls replay, flow completes.
-      const location3 = createLocation(hashFor({ message: JSON.stringify(respB), state: stateB }));
+      const location3 = createLocation(
+        hashFor({ message: JSON.stringify(respB), state: stateB ?? '' }),
+      );
       const { channel: channel3 } = createChannel({ storage, location: location3 });
       const responses3: JsonRpcResponse[] = [];
       channel3.addEventListener('response', r => responses3.push(r));
       await channel3.send({ jsonrpc: '2.0', id: 20, method: 'icrc27_accounts' }); // #0 cached
-      await flush();
+      await microtask();
       await channel3.send({ jsonrpc: '2.0', id: 21, method: 'icrc34_delegation' }); // #1 cached
-      await flush();
+      await microtask();
+      await tick();
       expect(location3.assign).not.toHaveBeenCalled();
       expect(responses3).toEqual([
         { ...respA, id: 20 },
