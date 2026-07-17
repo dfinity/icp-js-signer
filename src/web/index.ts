@@ -11,5 +11,6 @@ export {
   PostMessageTransportError,
   type PostMessageTransportOptions,
 } from './postMessageTransport.js';
-export { UrlChannel, type UrlChannelOptions } from './urlChannel.js';
+export { UrlChannel } from './urlChannel.js';
+export { UrlFlow, type UrlFlowOptions } from './urlFlow.js';
 export { UrlTransport, UrlTransportError, type UrlTransportOptions } from './urlTransport.js';

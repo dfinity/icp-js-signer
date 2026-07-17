@@ -1,5 +1,6 @@
 import type { Transport } from '../transport.js';
 import { UrlChannel } from './urlChannel.js';
+import { UrlFlow } from './urlFlow.js';
 
 /** Error thrown by {@link UrlTransport} for transport-level failures. */
 export class UrlTransportError extends Error {}
@@ -64,16 +65,16 @@ const isSecureContextUrl = (value: string): boolean => {
  * `postMessage` channel. Each request navigates the current window to the
  * signer with the request in the URL hash fragment; the signer returns the
  * response in the fragment of `callbackUrl`. Because a top-level redirect
- * unloads the page, the transport persists completed results (keyed by call
- * order) in {@link Storage} and replays them on the return load — so calling
- * code written as `const x = await a(); const y = await b(x)` continues where
- * it left off across the redirect.
+ * unloads the page, the transport keeps a call-order-keyed journal in
+ * {@link Storage} and replays it on the return load — so calling code written
+ * as `const x = await a(); const y = await b(x)` continues where it left off
+ * across the redirect.
  *
  * The calling code must run on every load and issue the same sequence of
- * requests in the same order (branch only on values recovered from earlier
- * responses), and keep side effects out of that sequence, because it
- * re-executes on each round-trip. Use `hasPendingFlow` to decide whether to
- * resume on load, and `clearFlow` once the flow has fully completed.
+ * requests and `memoize` steps in the same order (branch only on values
+ * recovered from earlier results), and keep side effects out of that sequence,
+ * because it re-executes on each round-trip. Use `hasPendingFlow` to decide
+ * whether to resume on load, and `clearFlow` once the flow has fully completed.
  * @see https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_167_browser_url_transport.md
  * @example
  * ```ts
@@ -84,13 +85,14 @@ const isSecureContextUrl = (value: string): boolean => {
  * const signer = new Signer({ transport });
  *
  * const connect = async () => {
- *   const accounts = await signer.accounts();          // call #0 → redirect
- *   const delegation = await signer.delegation({        // call #1 → redirect
- *     publicKey,
- *     targets,
- *   });
+ *   // Async pre-step, journaled so it runs once and replays across redirects.
+ *   const nonce = await transport.memoize(() => fetchAttributeNonce());
+ *   const [attributes, delegation] = await Promise.all([
+ *     signer.requestAttributes({ nonce }),
+ *     signer.delegation({ publicKey, targets }),
+ *   ]);
  *   transport.clearFlow();
- *   finish(accounts, delegation);
+ *   finish(nonce, attributes, delegation);
  * };
  *
  * if (transport.hasPendingFlow()) void connect();       // resume on load
@@ -98,7 +100,9 @@ const isSecureContextUrl = (value: string): boolean => {
  * ```
  */
 export class UrlTransport implements Transport {
-  readonly #options: Required<UrlTransportOptions>;
+  readonly #flow: UrlFlow;
+  readonly #storage: Storage;
+  readonly #storageKey: string;
 
   constructor(options: UrlTransportOptions) {
     if (!isSecureContextUrl(options.url)) {
@@ -114,19 +118,39 @@ export class UrlTransport implements Transport {
       throw new UrlTransportError('Callback url must not contain a fragment');
     }
 
-    this.#options = {
-      storage: globalThis.sessionStorage,
-      storageKey: 'icrc167:flow',
-      location: globalThis.location,
-      history: globalThis.history,
-      crypto: globalThis.crypto,
-      ...options,
-    };
+    this.#storage = options.storage ?? globalThis.sessionStorage;
+    this.#storageKey = options.storageKey ?? 'icrc167:flow';
+    this.#flow = new UrlFlow({
+      url: options.url,
+      callbackUrl: options.callbackUrl,
+      storage: this.#storage,
+      storageKey: this.#storageKey,
+      location: options.location ?? globalThis.location,
+      history: options.history ?? globalThis.history,
+      crypto: options.crypto ?? globalThis.crypto,
+    });
   }
 
-  /** Establishes a channel that resumes any in-progress flow from storage. */
+  /** Establishes a channel that drives this transport's shared flow journal. */
   establishChannel(): Promise<UrlChannel> {
-    return Promise.resolve(new UrlChannel(this.#options));
+    return Promise.resolve(new UrlChannel(this.#flow));
+  }
+
+  /**
+   * Runs `produce` once and journals its result in the same call-order record
+   * as requests, so an async pre-step — such as fetching a single-use nonce —
+   * runs on the first load and replays its result on the return load instead
+   * of re-running. This keeps a value that the signer signed against (e.g. a
+   * certified-attributes nonce) stable across the redirect.
+   *
+   * `produce` is awaited if it returns a promise. Its result must be
+   * JSON-serializable, and it is subject to the same ordering rule as
+   * requests: call `memoize` in a stable order across loads.
+   * @param produce - Produces the value to journal on the first load.
+   * @returns The produced value, or the journaled value on a replay load.
+   */
+  memoize<T>(produce: () => T | Promise<T>): Promise<T> {
+    return this.#flow.memoize(produce);
   }
 
   /**
@@ -135,11 +159,11 @@ export class UrlTransport implements Transport {
    * flow.
    */
   hasPendingFlow(): boolean {
-    return this.#options.storage.getItem(this.#options.storageKey) !== null;
+    return this.#storage.getItem(this.#storageKey) !== null;
   }
 
   /** Clears persisted flow state. Call once a flow has fully completed. */
   clearFlow(): void {
-    this.#options.storage.removeItem(this.#options.storageKey);
+    this.#storage.removeItem(this.#storageKey);
   }
 }

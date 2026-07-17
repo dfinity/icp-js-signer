@@ -48,8 +48,6 @@ The `callbackUrl` must be an absolute URL on an origin you control and be declar
 
 Because a top-level redirect unloads the page, the transport persists completed request results (keyed by call order) and replays them on the return load. Your flow code must therefore run on every load and issue the same sequence of requests in the same order — branch only on values recovered from earlier responses, and keep side effects out of the sequence, since it re-executes on each round-trip.
 
-Requests issued concurrently are coalesced into a single JSON-RPC batch and answered in one round-trip. For example, requesting certified attributes together with a delegation via `Promise.all([signer.delegation(...), signer.accounts(...)])` performs one redirect, not two. Sequential requests — where a later one depends on an earlier response — remain one redirect each.
-
 ```ts
 import { Signer } from '@icp-sdk/signer';
 import { UrlTransport } from '@icp-sdk/signer/web';
@@ -69,6 +67,23 @@ const connect = async () => {
 
 if (transport.hasPendingFlow()) void connect(); // resume mid-flow on load
 connectButton.onclick = () => void connect(); // start
+```
+
+Requests issued concurrently are coalesced into a single JSON-RPC batch and answered in one round-trip. For example, requesting certified attributes together with a delegation via `Promise.all([signer.delegation(...), signer.accounts(...)])` performs one redirect, not two. Sequential requests — where a later one depends on an earlier response — remain one redirect each.
+
+An async pre-step whose result must stay stable across the redirect — such as fetching a single-use nonce that the signer signs against — must be journaled too, so it runs once and replays afterward rather than being re-fetched on the return load. Use `transport.memoize(callback)`: it runs the callback once (awaiting a promise), records the result in the same call-order journal as requests, and replays it on the return load.
+
+```ts
+const connect = async () => {
+  const nonce = await transport.memoize(() => fetchAttributeNonce()); // fetched once, replayed after
+  const [attributes, delegation] = await Promise.all([
+    // one batched redirect
+    signer.requestAttributes({ nonce }),
+    signer.delegation({ publicKey, targets }),
+  ]);
+  transport.clearFlow();
+  finish(nonce, attributes, delegation);
+};
 ```
 
 A signer can also start a flow (ICRC-167 signer-initiated interaction). Read it on load with `readSignerInitiation`, then begin an ordinary flow — validating the optional `signer` hint against signers you already trust:
