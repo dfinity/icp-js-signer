@@ -63,6 +63,15 @@ export class UrlChannel implements Channel {
       return Promise.reject(new Error('Communication channel is closed'));
     }
 
+    // A request without an id gets no response, so it could never complete over
+    // a redirect — it would re-navigate on every replay. Reject up front rather
+    // than loop. (Notifications are inherently unsupported by this transport.)
+    if (request.id === undefined || request.id === null) {
+      return Promise.reject(
+        new Error('The URL transport requires a request id; notifications are not supported'),
+      );
+    }
+
     const index = this.#flow.next();
     const cached = this.#flow.get(index);
     if (cached !== undefined) {

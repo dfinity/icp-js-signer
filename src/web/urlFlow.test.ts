@@ -212,7 +212,7 @@ describe('UrlFlow', () => {
     expect(readStored(storage).pending).toBeUndefined();
   });
 
-  it('ignores a return whose state does not match', () => {
+  it('strips the fragment but does not absorb when the state does not match', () => {
     const seeded = JSON.stringify({
       createdAt: NOW,
       results: {},
@@ -224,9 +224,10 @@ describe('UrlFlow', () => {
     );
     const { flow, history } = createFlow({ storage, location });
 
-    expect(flow.get(0)).toBeUndefined();
-    expect(history.replaceState).not.toHaveBeenCalled();
-    expect(storage.getItem(KEY)).toBe(seeded);
+    expect(flow.get(0)).toBeUndefined(); // not absorbed — state mismatch starts fresh
+    // Still stripped, so a stray response can't leak via history/referrer.
+    expect(history.replaceState).toHaveBeenCalledWith(null, '', '/signer-callback');
+    expect(storage.getItem(KEY)).toBe(seeded); // not persisted over
   });
 
   it('preserves memoized results when absorbing a signer return', () => {

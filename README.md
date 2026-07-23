@@ -61,24 +61,24 @@ const transport = new UrlTransport({
 const signer = new Signer({ transport });
 
 // Runs on the /connect route's load — fresh visit or signer return:
-const accounts = await signer.accounts(); // redirect; replays on return
-const delegation = await signer.delegation({ publicKey, targets }); // redirect; replays on return
+const accounts = await signer.getAccounts(); // redirect; replays on return
+const delegation = await signer.requestDelegation({ publicKey, targets }); // redirect; replays on return
 finish(accounts, delegation); // runs once, on completion
 ```
 
 To start such a flow from elsewhere, navigate the browser to its route (a link) — no method call.
 
-Requests issued concurrently are coalesced into a single JSON-RPC batch and answered in one round-trip. For example, requesting certified attributes together with a delegation via `Promise.all([signer.delegation(...), signer.accounts(...)])` performs one redirect, not two. Sequential requests — where a later one depends on an earlier response — remain one redirect each.
+Requests issued concurrently are coalesced into a single JSON-RPC batch and answered in one round-trip. For example, requesting the accounts together with a delegation via `Promise.all([signer.requestDelegation(...), signer.getAccounts(...)])` performs one redirect, not two. Sequential requests — where a later one depends on an earlier response — remain one redirect each.
 
 `transport.memoize(callback)` is how a flow does **any async work other than a signer request** — the sole place it may `await` non-request async. It runs the callback once, records the result in the same call-order journal as requests, and replays that result on the return load instead of re-running. This keeps a value stable across the redirect (e.g. a single-use nonce the signer signs against, which must not be re-fetched on return), whether it's a pre-step or between requests.
 
 ```ts
 // On the flow's route:
-const nonce = await transport.memoize(() => fetchAttributeNonce()); // fetched once, replayed after
+const nonce = await transport.memoize(() => fetchNonce()); // fetched once, replayed after
 const [attributes, delegation] = await Promise.all([
   // one batched redirect
-  signer.requestAttributes({ nonce }),
-  signer.delegation({ publicKey, targets }),
+  signer.sendRequest({ jsonrpc: '2.0', id: 1, method: 'attributes', params: { nonce } }),
+  signer.requestDelegation({ publicKey, targets }),
 ]);
 finish(nonce, attributes, delegation); // runs once, on completion
 ```

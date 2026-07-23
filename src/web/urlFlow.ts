@@ -100,6 +100,14 @@ export class UrlFlow {
     const message = params.get('message');
     const state = params.get('state');
 
+    // A response fragment must never linger in history or the referrer — strip
+    // it whenever one is present, even when it doesn't match a pending flow
+    // (e.g. storage was cleared or the state mismatched), since it may carry a
+    // delegation or other sensitive result.
+    if (message !== null) {
+      options.history.replaceState(null, '', options.location.pathname + options.location.search);
+    }
+
     if (
       !expired &&
       message !== null &&
@@ -122,8 +130,6 @@ export class UrlFlow {
         }
       }
       this.#persist();
-      // Strip the fragment so the response doesn't linger in history or the referrer.
-      options.history.replaceState(null, '', options.location.pathname + options.location.search);
     } else {
       // Not a return: start fresh. Any leftover journal is ignored and
       // overwritten by the first request.

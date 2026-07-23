@@ -108,10 +108,10 @@ const isSecureContextUrl = (value: string): boolean => {
  * const signer = new Signer({ transport });
  *
  * // On the load of the callback route (fresh arrival or signer return):
- * const nonce = await transport.memoize(() => fetchAttributeNonce());
+ * const nonce = await transport.memoize(() => fetchNonce());
  * const [attributes, delegation] = await Promise.all([
- *   signer.requestAttributes({ nonce }),
- *   signer.delegation({ publicKey, targets }),
+ *   signer.sendRequest({ jsonrpc: "2.0", id: 1, method: "attributes", params: { nonce } }),
+ *   signer.requestDelegation({ publicKey, targets }),
  * ]);
  * finish(nonce, attributes, delegation); // runs once, on completion
  * ```

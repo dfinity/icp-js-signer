@@ -137,6 +137,13 @@ describe('UrlChannel', () => {
     await expect(channel.send({ jsonrpc: '2.0', id: 1, method: 'x' })).rejects.toThrow();
   });
 
+  it('rejects a request without an id (notifications would redirect-loop)', async () => {
+    const { channel, location } = createChannel();
+    await expect(channel.send({ jsonrpc: '2.0', method: 'x' })).rejects.toThrow();
+    await tick();
+    expect(location.assign).not.toHaveBeenCalled(); // never navigates for an unanswerable request
+  });
+
   it('notifies close listeners', async () => {
     const { channel } = createChannel();
     const listener = vi.fn();
