@@ -79,10 +79,10 @@ describe('UrlFlow', () => {
     expect(flow.next()).toBe(1);
   });
 
-  it('navigates a single buffered request after settling', async () => {
+  it('navigates a single buffered request after flushing', async () => {
     const { flow, location, storage } = createFlow({ states: ['S'] });
     flow.request(flow.next(), request(1, 'icrc27_accounts'));
-    expect(location.assign).not.toHaveBeenCalled(); // deferred to settle
+    expect(location.assign).not.toHaveBeenCalled(); // deferred to the flush macrotask
     await tick();
 
     expect(location.assign).toHaveBeenCalledOnce();
@@ -114,14 +114,34 @@ describe('UrlFlow', () => {
     expect(location.assign).toHaveBeenCalledOnce();
   });
 
-  it('clears the journal once the flow settles without navigating', async () => {
+  it('starts fresh on a bare load, ignoring a leftover completed journal', async () => {
+    const cached = response(1, { accounts: [] });
     const storage = createStorage({
-      [KEY]: JSON.stringify({ createdAt: NOW, results: { 0: response(1, {}) } }),
+      [KEY]: JSON.stringify({ createdAt: NOW, results: { 0: cached } }), // completed, no pending
     });
-    const { flow } = createFlow({ storage });
-    flow.touch(); // a replayed cached call; nothing navigates
+    const { flow, location } = createFlow({ storage, states: ['S2'] }); // no message in the URL
+
+    expect(flow.get(0)).toBeUndefined(); // leftover results ignored, not replayed
+    flow.request(flow.next(), request(9, 'icrc27_accounts')); // slot 0 of the fresh flow
     await tick();
-    expect(storage.getItem(KEY)).toBeNull();
+
+    expect(location.assign).toHaveBeenCalledOnce(); // navigates fresh
+    expect(readStored(storage).results).toEqual({}); // stale journal overwritten
+    expect(readStored(storage).pending).toEqual({ state: 'S2', requests: [{ index: 0, id: 9 }] });
+  });
+
+  it('starts fresh when a leftover pending has no matching return', () => {
+    const storage = createStorage({
+      [KEY]: JSON.stringify({
+        createdAt: NOW,
+        results: {},
+        pending: { state: 'S', requests: [{ index: 0, id: 1 }] },
+      }),
+    });
+    const { flow, location } = createFlow({ storage }); // abandoned pending, no message
+
+    expect(flow.get(0)).toBeUndefined();
+    expect(location.assign).not.toHaveBeenCalled(); // does not auto-re-navigate the stale pending
   });
 
   it('holds off navigation until an in-flight memoize is recorded', async () => {
@@ -143,18 +163,25 @@ describe('UrlFlow', () => {
     expect(stored.pending.requests).toEqual([{ index: 1, id: 1 }]);
   });
 
-  it('memoize runs the producer once and replays its journaled value', async () => {
-    const { flow, storage } = createFlow();
+  it('replays a journaled memoized value across a redirect return', async () => {
+    const storage = createStorage();
     const produce = vi.fn().mockResolvedValue('nonce');
 
-    expect(await flow.memoize(produce)).toBe('nonce');
+    // Load 1: memoize the nonce, then a request that navigates.
+    const first = createFlow({ storage, states: ['S'] });
+    expect(await first.flow.memoize(produce)).toBe('nonce'); // slot 0
+    first.flow.request(first.flow.next(), request(1, 'icrc34_delegation')); // slot 1
+    await tick();
     expect(produce).toHaveBeenCalledOnce();
-    expect(readStored(storage).results).toEqual({ 0: 'nonce' });
 
-    const replay = createFlow({ storage });
+    // Load 2: signer return → memoize (slot 0) replays without re-running.
+    const resp = response(1, { ok: true });
+    const location = createLocation(hashFor({ message: JSON.stringify(resp), state: 'S' }));
+    const { flow } = createFlow({ storage, location });
     const produceAgain = vi.fn();
-    expect(await replay.flow.memoize(produceAgain)).toBe('nonce');
+    expect(await flow.memoize(produceAgain)).toBe('nonce'); // slot 0 replays from the journal
     expect(produceAgain).not.toHaveBeenCalled();
+    expect(flow.get(1)).toEqual(resp); // slot 1 absorbed from the return
   });
 
   it('absorbs a batch return by id and strips the fragment', () => {

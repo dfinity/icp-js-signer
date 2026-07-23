@@ -63,23 +63,19 @@ const parseJson = (value: string): unknown => {
  * The shared journal for one URL-transport flow (one page load).
  *
  * A single call-order-keyed record of results is shared by memoized steps and
- * signer requests, and persisted across the top-level redirect. On the return
- * load the calling code re-runs; each memoized step and each request that has
- * already completed resolves from this journal instead of running or
- * navigating again, so `const x = await a(); const y = await b(x)` replays to
- * where it left off. Concurrently issued requests are coalesced into one
- * JSON-RPC batch and one redirect.
+ * signer requests, and persisted across the top-level redirect. Concurrently
+ * issued requests are coalesced into one JSON-RPC batch and one redirect.
  *
- * Completion is detected by quiescence: the flow reschedules a settle task on
- * every call, and once the calls have settled it either navigates the batch
- * (if any request missed) or, if nothing navigated, clears the journal (the
- * flow ran to the end). This is only sound when the calling code awaits
- * **nothing but `memoize` and signer requests between calls** — an in-flight
- * `memoize` producer holds settle off (so it can't fire mid-fetch, and so a
- * concurrent memoized value is recorded before any redirect), but a bare
- * `await` the flow makes on its own is invisible here and would let settle
- * fire in the gap. The `flowTimeout` stamp is a backstop: a journal older than
- * the timeout is treated as absent, so an abandoned flow is not resumed later.
+ * A load continues an existing flow only when it is a signer **return** — the
+ * URL carries a `message` matching the stored `pending`. In that case the
+ * returned responses are folded into the journal and the calling code replays
+ * from it (already-completed calls resolve from storage instead of navigating
+ * again). Any other load — a bare visit to the callback, a leftover completed
+ * journal, or an abandoned `pending` with no `message` — starts a **fresh**
+ * flow: the stored journal is ignored and overwritten by the first request. So
+ * navigating to the callback always starts the flow, and there is no separate
+ * "clear" step — a finished flow's journal is simply inert to the next one.
+ * (`flowTimeout` is a backstop for the storage entry.)
  */
 export class UrlFlow {
   readonly #options: UrlFlowOptions;
@@ -89,29 +85,31 @@ export class UrlFlow {
   #createdAt?: number;
   #buffer: { index: number; request: JsonRpcRequest }[] = [];
   #inFlight = 0;
-  #settleTimer?: ReturnType<typeof setTimeout>;
+  #flushTimer?: ReturnType<typeof setTimeout>;
 
   constructor(options: UrlFlowOptions) {
     this.#options = options;
     const stored = readStored(options.storage, options.storageKey);
-
     const expired =
       stored.createdAt !== undefined && options.now() - stored.createdAt > options.flowTimeout;
     if (expired) {
       options.storage.removeItem(options.storageKey);
-      this.#results = {};
-      return;
     }
 
-    this.#createdAt = stored.createdAt;
-    this.#results = stored.results;
-
-    // If this load is a signer return, fold each response of the returned
-    // batch into the journal by the index of the request awaiting it.
     const params = new URLSearchParams(options.location.hash.slice(1));
     const message = params.get('message');
     const state = params.get('state');
-    if (message !== null && stored.pending !== undefined && state === stored.pending.state) {
+
+    if (
+      !expired &&
+      message !== null &&
+      stored.pending !== undefined &&
+      state === stored.pending.state
+    ) {
+      // Signer return: keep the completed results and fold in the returned
+      // batch by the index of the request awaiting each response.
+      this.#createdAt = stored.createdAt;
+      this.#results = { ...stored.results };
       const parsed = parseJson(message);
       const responses = Array.isArray(parsed) ? parsed : [parsed];
       for (const { index, id } of stored.pending.requests) {
@@ -126,6 +124,10 @@ export class UrlFlow {
       this.#persist();
       // Strip the fragment so the response doesn't linger in history or the referrer.
       options.history.replaceState(null, '', options.location.pathname + options.location.search);
+    } else {
+      // Not a return: start fresh. Any leftover journal is ignored and
+      // overwritten by the first request.
+      this.#results = {};
     }
   }
 
@@ -142,19 +144,14 @@ export class UrlFlow {
     return this.#results[index];
   }
 
-  /** Marks flow activity (a replayed call), rescheduling the settle task. */
-  touch(): void {
-    this.#scheduleSettle();
-  }
-
   /**
-   * Buffers an uncached request for the next redirect and marks activity.
+   * Buffers an uncached request for the next redirect.
    * @param index - The call-order slot reserved for the request.
    * @param request - The JSON-RPC request to send on the next redirect.
    */
   request(index: number, request: JsonRpcRequest): void {
     this.#buffer.push({ index, request });
-    this.#scheduleSettle();
+    this.#scheduleFlush();
   }
 
   /**
@@ -170,7 +167,6 @@ export class UrlFlow {
     const index = this.next();
     const cached = this.get(index);
     if (cached !== undefined) {
-      this.#scheduleSettle();
       return cached as T;
     }
     this.#inFlight++;
@@ -181,31 +177,28 @@ export class UrlFlow {
       return value;
     } finally {
       this.#inFlight--;
-      this.#scheduleSettle();
+      // A buffered request may have been held off while this producer ran.
+      this.#scheduleFlush();
     }
   }
 
-  #scheduleSettle(): void {
-    if (this.#settleTimer !== undefined) {
-      clearTimeout(this.#settleTimer);
+  #scheduleFlush(): void {
+    if (this.#flushTimer !== undefined) {
+      clearTimeout(this.#flushTimer);
     }
-    this.#settleTimer = setTimeout(() => this.#settle(), 0);
+    // Defer to a macrotask so concurrently issued requests are collected into
+    // one batch before navigating.
+    this.#flushTimer = setTimeout(() => this.#flush(), 0);
   }
 
-  #settle(): void {
-    this.#settleTimer = undefined;
-    // A memoize producer is still running; it reschedules settle on resolve.
-    if (this.#inFlight > 0) {
+  #flush(): void {
+    this.#flushTimer = undefined;
+    // Hold the redirect until any in-flight memoize producer has recorded, so a
+    // concurrently produced value (e.g. a nonce) is journaled before we leave.
+    if (this.#inFlight > 0 || this.#buffer.length === 0) {
       return;
     }
-    if (this.#buffer.length > 0) {
-      this.#navigate();
-      return;
-    }
-    // No request missed and nothing navigated: the flow ran to completion.
-    if (!this.#navigated) {
-      this.#options.storage.removeItem(this.#options.storageKey);
-    }
+    this.#navigate();
   }
 
   #navigate(): void {

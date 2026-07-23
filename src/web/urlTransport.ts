@@ -87,11 +87,12 @@ const isSecureContextUrl = (value: string): boolean => {
  * Run the calling code on the load of the flow's route: a fresh arrival and
  * the signer's return both land there, so re-running it starts the flow the
  * first time and replays it on the return. No resume or cleanup call is
- * needed — the flow detects completion once the calls settle and clears its
- * own journal. This requires the calling code to await **nothing but `memoize`
- * and signer requests between calls** (branch only on values recovered from
- * earlier results); a bare `await` between calls is invisible to the completion
- * detection and breaks the replay. See {@link UrlFlow}.
+ * needed — a signer return (a `message` matching the pending) continues the
+ * flow; any other load starts a fresh one, ignoring a finished flow's leftover
+ * journal. Issue the same requests and `memoize` steps in the same order on
+ * every load (branch only on values recovered from earlier results), and route
+ * any value a request depends on — such as a nonce — through `memoize` so it
+ * stays stable across the redirect. See {@link UrlFlow}.
  *
  * The journal is namespaced by `callbackUrl` by default, so a relying party
  * with several flows (each with its own callback) gets an isolated journal per

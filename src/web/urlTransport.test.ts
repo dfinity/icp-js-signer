@@ -93,17 +93,20 @@ describe('UrlTransport', () => {
   });
 
   describe('flow journal', () => {
-    it('auto-clears when a replayed flow completes without navigating', async () => {
-      const storage = createStorage({ [KEY]: journal({ 0: response(1, { accounts: [] }) }) });
-      const transport = new UrlTransport(options({ storage }));
+    it('does not replay a completed leftover journal (a new flow starts fresh)', async () => {
+      const storage = createStorage({ [KEY]: journal({ 0: response(1, { accounts: [] }) }) }); // completed, no pending
+      const location = createLocation();
+      const transport = new UrlTransport(options({ storage, location }));
       const channel = await transport.establishChannel();
-      channel.addEventListener('response', () => {});
+      const listener = vi.fn();
+      channel.addEventListener('response', listener);
 
-      await channel.send({ jsonrpc: '2.0', id: 9, method: 'icrc27_accounts' }); // cached, no miss
+      await channel.send({ jsonrpc: '2.0', id: 9, method: 'icrc27_accounts' });
       await microtask();
       await tick();
 
-      expect(storage.getItem(KEY)).toBeNull();
+      expect(listener).not.toHaveBeenCalled(); // stale result not replayed
+      expect(location.assign).toHaveBeenCalledOnce(); // navigated fresh instead
     });
 
     it('namespaces the journal by callback url', async () => {
@@ -134,12 +137,20 @@ describe('UrlTransport', () => {
       expect(JSON.parse(storage.getItem(KEY) ?? 'null').results).toEqual({ 0: 'nonce' });
     });
 
-    it('replays a journaled result without re-running the callback', async () => {
-      const storage = createStorage({ [KEY]: journal({ 0: 'nonce' }) });
-      const transport = new UrlTransport(options({ storage }));
+    it('replays a journaled result on a return without re-running the callback', async () => {
+      const returned = response('d', { ok: true });
+      const storage = createStorage({
+        [KEY]: JSON.stringify({
+          createdAt: NOW,
+          results: { 0: 'nonce' },
+          pending: { state: 'S', requests: [{ index: 1, id: 'd' }] },
+        }),
+      });
+      const location = createLocation(hashFor({ message: JSON.stringify(returned), state: 'S' }));
+      const transport = new UrlTransport(options({ storage, location }));
       const produce = vi.fn();
 
-      expect(await transport.memoize(produce)).toBe('nonce');
+      expect(await transport.memoize(produce)).toBe('nonce'); // slot 0 kept across the return
       expect(produce).not.toHaveBeenCalled();
     });
 
@@ -196,7 +207,6 @@ describe('UrlTransport', () => {
         { ...attributes, id: 10 },
         { ...delegation, id: 11 },
       ]);
-      expect(storage.getItem(KEY)).toBeNull(); // completed flow auto-cleared
     });
   });
 });

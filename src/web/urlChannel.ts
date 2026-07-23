@@ -12,9 +12,10 @@ import type { UrlFlow } from './urlFlow.js';
  * arrives on this load — it arrives on the return load, when the calling code
  * replays this request and it resolves from the journal.
  *
- * The flow detects completion and cleans up automatically once the calls
- * settle, so callers need no explicit resume or cleanup step. This requires the
- * calling code to await nothing but `memoize` and signer requests between calls;
+ * Callers need no explicit resume or cleanup step: a signer return continues
+ * the flow, and any other load starts a fresh one. Issue the same requests (and
+ * `memoize` steps) in the same order on every load, and route any value a
+ * request depends on through `memoize` so it stays stable across the redirect;
  * see {@link UrlFlow} and the module README for the replay contract.
  * @see https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_167_browser_url_transport.md
  */
@@ -73,7 +74,6 @@ export class UrlChannel implements Channel {
           listener(response);
         }
       });
-      this.#flow.touch();
       return Promise.resolve();
     }
 

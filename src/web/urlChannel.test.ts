@@ -65,7 +65,7 @@ const assignedFragment = (location: MockLocation) =>
   new URLSearchParams(new URL(location.assign.mock.calls[0][0]).hash.slice(1));
 
 describe('UrlChannel', () => {
-  it('buffers a fresh call and navigates once the flow settles', async () => {
+  it('buffers a fresh call and navigates on the next macrotask', async () => {
     const { channel, location } = createChannel({ states: ['S'] });
     const request = { jsonrpc: '2.0' as const, id: 1, method: 'icrc27_accounts' };
 
@@ -90,12 +90,20 @@ describe('UrlChannel', () => {
     expect(JSON.parse(assignedFragment(location).get('message') ?? '')).toEqual([a, b]);
   });
 
-  it('replays a completed call from the journal, re-stamping the id', async () => {
-    const cached = response('originally-different-id', { accounts: [] });
+  it('replays a call from the journal on a return, re-stamping the id', async () => {
+    // A return load: the response for the pending request is in the URL.
+    const returned = response('req', { accounts: [] });
     const storage = createStorage({
-      [KEY]: JSON.stringify({ createdAt: 1000, results: { 0: cached } }),
+      [KEY]: JSON.stringify({
+        createdAt: 1000,
+        results: {},
+        pending: { state: 'S', requests: [{ index: 0, id: 'req' }] },
+      }),
     });
-    const { channel, location } = createChannel({ storage });
+    const location = createLocation(
+      `#${new URLSearchParams({ message: JSON.stringify(returned), state: 'S' }).toString()}`,
+    );
+    const { channel } = createChannel({ storage, location });
     const listener = vi.fn();
     channel.addEventListener('response', listener);
 
@@ -103,21 +111,24 @@ describe('UrlChannel', () => {
     await microtask();
 
     expect(location.assign).not.toHaveBeenCalled();
-    expect(listener).toHaveBeenCalledWith({ ...cached, id: 7 });
+    expect(listener).toHaveBeenCalledWith({ ...returned, id: 7 }); // re-stamped with this call's id
   });
 
-  it('clears the journal when a replayed flow completes without navigating', async () => {
-    const cached = response('old', { accounts: [] });
+  it('starts fresh on a bare load, not replaying a leftover journal', async () => {
+    const stale = response('old', { accounts: [] });
     const storage = createStorage({
-      [KEY]: JSON.stringify({ createdAt: 1000, results: { 0: cached } }),
+      [KEY]: JSON.stringify({ createdAt: 1000, results: { 0: stale } }), // completed, no message
     });
-    const { channel } = createChannel({ storage });
+    const { channel, location } = createChannel({ storage, states: ['S'] });
+    const listener = vi.fn();
+    channel.addEventListener('response', listener);
 
-    await channel.send({ jsonrpc: '2.0', id: 7, method: 'icrc27_accounts' }); // cached, no miss
+    await channel.send({ jsonrpc: '2.0', id: 7, method: 'icrc27_accounts' });
     await microtask();
     await tick();
 
-    expect(storage.getItem(KEY)).toBeNull();
+    expect(listener).not.toHaveBeenCalled(); // did not replay the stale result
+    expect(location.assign).toHaveBeenCalledOnce(); // navigated fresh instead
   });
 
   it('rejects send when the channel is closed', async () => {
