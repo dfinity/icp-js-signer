@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Feat
+
+- **web**: add ICRC-167 browser URL transport (#27)
+
 ## 5.4.0 (2026-05-22)
 
 ### Feat
