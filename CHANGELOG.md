@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Feat
+
+- **web**: harden the URL transport's redirect resume (#30)
+
 ## 5.5.0 (2026-07-23)
 
 ### Feat
