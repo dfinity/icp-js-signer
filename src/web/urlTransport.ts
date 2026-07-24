@@ -160,13 +160,22 @@ export class UrlTransport implements Transport {
    * against, which must not be re-fetched on return), whether it is a pre-step
    * or falls between requests.
    *
-   * `produce` is awaited if it returns a promise. Its result must be
-   * JSON-serializable, and it is subject to the same ordering rule as
-   * requests: call `memoize` in a stable order across loads.
+   * Mirrors the producer's sync/async shape: a synchronous `produce` returns
+   * its value directly, an asynchronous one returns a promise. A replay resolves
+   * synchronously (the value is already journaled), so awaiting the result is
+   * always safe — `await` on a non-promise is a no-op. Returning synchronously
+   * lets a value be memoized where an `await` is not possible (e.g. read in a
+   * constructor to configure a dependency) while staying stable across the
+   * redirect.
+   *
+   * Its result must be JSON-serializable, and it is subject to the same ordering
+   * rule as requests: call `memoize` in a stable order across loads.
    * @param produce - Produces the value to journal on the first load.
    * @returns The produced value, or the journaled value on a replay load.
    */
-  memoize<T>(produce: () => T | Promise<T>): Promise<T> {
+  memoize<T>(produce: () => Promise<T>): Promise<T>;
+  memoize<T>(produce: () => T): T;
+  memoize<T>(produce: () => T | Promise<T>): T | Promise<T> {
     return this.#flow.memoize(produce);
   }
 }
