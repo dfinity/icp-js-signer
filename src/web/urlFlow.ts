@@ -34,7 +34,22 @@ interface PendingRequest {
 /** The persisted journal: results by call order, plus any batch in flight. */
 interface StoredFlow {
   createdAt?: number;
+  /**
+   * The redirect target captured on the first load. A signer return lands on
+   * the callback with no query, so an RP that derives its transport `url` from
+   * the query (identity provider, discovery/SSO params, …) reconstructs it as a
+   * bare default on the return load. Persisting it here lets a second hop in the
+   * same flow redirect to the original target rather than that default.
+   */
+  url?: string;
   results: Record<number, unknown>;
+  /**
+   * Call-order slots whose producer was asynchronous. `memoize` mirrors its
+   * producer's shape, so on a replay load these slots must resolve to a promise
+   * even though the journaled value is the already-resolved result — otherwise a
+   * promise-returning `memoize` would hand back a bare value on the second run.
+   */
+  asyncSlots?: number[];
   pending?: { state: string; requests: PendingRequest[] };
 }
 
@@ -45,7 +60,13 @@ const readStored = (storage: Storage, key: string): StoredFlow => {
   }
   try {
     const parsed = JSON.parse(raw) as StoredFlow;
-    return { createdAt: parsed.createdAt, results: parsed.results ?? {}, pending: parsed.pending };
+    return {
+      createdAt: parsed.createdAt,
+      url: parsed.url,
+      results: parsed.results ?? {},
+      asyncSlots: parsed.asyncSlots,
+      pending: parsed.pending,
+    };
   } catch {
     return { results: {} };
   }
@@ -83,12 +104,22 @@ export class UrlFlow {
   #index = 0;
   #navigated = false;
   #createdAt?: number;
+  // The redirect target used for navigation. Seeded from the constructor url,
+  // but on a signer return replaced by the target persisted on the first load,
+  // so a second hop reaches the same signer even when the return-load url is a
+  // bare default (see StoredFlow.url).
+  #url: string;
+  // Call-order slots whose producer was async, so a replay returns a promise
+  // (see StoredFlow.asyncSlots).
+  #asyncSlots: Set<number>;
   #buffer: { index: number; request: JsonRpcRequest }[] = [];
   #inFlight = 0;
   #flushTimer?: ReturnType<typeof setTimeout>;
 
   constructor(options: UrlFlowOptions) {
     this.#options = options;
+    this.#url = options.url;
+    this.#asyncSlots = new Set();
     const stored = readStored(options.storage, options.storageKey);
     const expired =
       stored.createdAt !== undefined && options.now() - stored.createdAt > options.flowTimeout;
@@ -117,7 +148,11 @@ export class UrlFlow {
       // Signer return: keep the completed results and fold in the returned
       // batch by the index of the request awaiting each response.
       this.#createdAt = stored.createdAt;
+      // Recover the original redirect target; the return-load url may be a
+      // bare default (the query that produced it is gone on the callback).
+      this.#url = stored.url ?? options.url;
       this.#results = { ...stored.results };
+      this.#asyncSlots = new Set(stored.asyncSlots);
       const parsed = parseJson(message);
       const responses = Array.isArray(parsed) ? parsed : [parsed];
       for (const { index, id } of stored.pending.requests) {
@@ -169,22 +204,51 @@ export class UrlFlow {
    * @param produce - Produces the value on the first load; awaited if a promise.
    * @returns The produced value, or the journaled value on a replay load.
    */
-  async memoize<T>(produce: () => T | Promise<T>): Promise<T> {
+  memoize<T>(produce: () => Promise<T>): Promise<T>;
+  memoize<T>(produce: () => T): T;
+  memoize<T>(produce: () => T | Promise<T>): T | Promise<T> {
     const index = this.next();
     const cached = this.get(index);
     if (cached !== undefined) {
-      return cached as T;
+      // Replay: mirror the producer's original shape. An async slot resolves to
+      // a promise (even though the journaled value is already resolved) so a
+      // promise-returning memoize never hands back a bare value on the second
+      // run; a sync slot returns the value directly.
+      return this.#asyncSlots.has(index) ? Promise.resolve(cached as T) : (cached as T);
     }
-    this.#inFlight++;
-    try {
-      const value = await produce();
+
+    const record = (value: T, isAsync: boolean): T => {
       this.#results[index] = value;
+      if (isAsync) {
+        this.#asyncSlots.add(index);
+      }
       this.#persist();
       return value;
-    } finally {
+    };
+    const release = (): void => {
       this.#inFlight--;
       // A buffered request may have been held off while this producer ran.
       this.#scheduleFlush();
+    };
+
+    this.#inFlight++;
+    let produced: T | Promise<T>;
+    try {
+      produced = produce();
+    } catch (error) {
+      release();
+      throw error;
+    }
+    // Async producer: keep the in-flight count raised until it records, so the
+    // batch flush waits for it (a concurrently produced value, e.g. a nonce, is
+    // journaled before we navigate). Sync producer: record and release now.
+    if (produced instanceof Promise) {
+      return produced.then(value => record(value, true)).finally(release);
+    }
+    try {
+      return record(produced, false);
+    } finally {
+      release();
     }
   }
 
@@ -228,14 +292,20 @@ export class UrlFlow {
       callback: this.#options.callbackUrl,
       state,
     });
-    this.#options.location.assign(`${this.#options.url}#${fragment.toString()}`);
+    this.#options.location.assign(`${this.#url}#${fragment.toString()}`);
   }
 
   #persist(pending?: { state: string; requests: PendingRequest[] }): void {
     this.#createdAt ??= this.#options.now();
     this.#options.storage.setItem(
       this.#options.storageKey,
-      JSON.stringify({ createdAt: this.#createdAt, results: this.#results, pending }),
+      JSON.stringify({
+        createdAt: this.#createdAt,
+        url: this.#url,
+        results: this.#results,
+        asyncSlots: [...this.#asyncSlots],
+        pending,
+      }),
     );
   }
 }

@@ -179,7 +179,11 @@ describe('UrlFlow', () => {
     const location = createLocation(hashFor({ message: JSON.stringify(resp), state: 'S' }));
     const { flow } = createFlow({ storage, location });
     const produceAgain = vi.fn();
-    expect(await flow.memoize(produceAgain)).toBe('nonce'); // slot 0 replays from the journal
+    const replayed = flow.memoize(produceAgain); // slot 0 replays from the journal
+    // The original producer was async, so the replay is a promise too — memoize
+    // never downgrades an async producer to a bare value on the return run.
+    expect(replayed).toBeInstanceOf(Promise);
+    expect(await replayed).toBe('nonce');
     expect(produceAgain).not.toHaveBeenCalled();
     expect(flow.get(1)).toEqual(resp); // slot 1 absorbed from the return
   });
@@ -259,5 +263,65 @@ describe('UrlFlow', () => {
 
     expect(flow.get(0)).toBeUndefined();
     expect(storage.getItem(KEY)).toBeNull();
+  });
+
+  it('navigates a second hop to the redirect target persisted on the first load', async () => {
+    const storage = createStorage();
+
+    // Load 1: a fresh flow with the real target navigates and persists it.
+    const first = createFlow({ storage, states: ['S1'] });
+    first.flow.request(first.flow.next(), request(1, 'icrc34_delegation')); // slot 0
+    await tick();
+    expect(first.location.assign).toHaveBeenCalledWith(expect.stringContaining(URL_));
+    expect(readStored(storage).url).toBe(URL_);
+
+    // Load 2: signer return for slot 0, then a second request needs another hop.
+    // Reconstruct with a bare default url — what an RP gets once the query that
+    // produced the real target is gone from the callback.
+    const location = createLocation(
+      hashFor({ message: JSON.stringify(response(1, { ok: true })), state: 'S1' }),
+    );
+    const second = new UrlFlow({
+      url: 'https://default.example.com/',
+      callbackUrl: CALLBACK,
+      storage,
+      storageKey: KEY,
+      flowTimeout: 1_000_000,
+      location: location as UrlFlowOptions['location'],
+      history: { replaceState: vi.fn() },
+      crypto: { randomUUID: () => 'S2' } as Pick<Crypto, 'randomUUID'>,
+      now: () => NOW,
+    });
+    expect(second.get(0)).toEqual(response(1, { ok: true })); // first hop absorbed
+    second.request(second.next(), request(2, 'icrc34_delegation')); // slot 1, uncached
+    await tick();
+
+    // The second hop goes to the original target, not the reconstructed default.
+    expect(location.assign).toHaveBeenCalledOnce();
+    expect(location.assign.mock.calls[0][0]).toContain(URL_);
+    expect(location.assign.mock.calls[0][0]).not.toContain('default.example.com');
+  });
+
+  it('memoize returns synchronously for a sync producer and replays it synchronously', async () => {
+    const storage = createStorage();
+
+    // Load 1: a sync producer returns its value directly (not a promise), then
+    // a request navigates so the return load has a flow to resume.
+    const first = createFlow({ storage, states: ['S'] });
+    const produce = vi.fn(() => 'derivation-origin');
+    const value = first.flow.memoize(produce); // slot 0
+    expect(value).toBe('derivation-origin'); // returned synchronously
+    first.flow.request(first.flow.next(), request(1, 'icrc34_delegation')); // slot 1
+    await tick();
+    expect(produce).toHaveBeenCalledOnce();
+
+    // Load 2: signer return → slot 0 replays synchronously, producer not re-run.
+    const location = createLocation(
+      hashFor({ message: JSON.stringify(response(1, {})), state: 'S' }),
+    );
+    const { flow } = createFlow({ storage, location });
+    const produceAgain = vi.fn(() => 'nope');
+    expect(flow.memoize(produceAgain)).toBe('derivation-origin');
+    expect(produceAgain).not.toHaveBeenCalled();
   });
 });
