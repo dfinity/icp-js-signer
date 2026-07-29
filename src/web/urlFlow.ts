@@ -1,5 +1,27 @@
 import { type JsonRpcRequest, type JsonRpcResponse, isJsonRpcResponse } from '../transport.js';
 
+// Whether `hostname` is a loopback host per the secure-context definition:
+// `localhost`, `*.localhost`, the `127.0.0.0/8` range, or `[::1]`.
+const isLoopbackHost = (hostname: string): boolean =>
+  hostname === 'localhost' ||
+  hostname.endsWith('.localhost') ||
+  hostname === '[::1]' ||
+  /^127(?:\.\d{1,3}){3}$/.test(hostname);
+
+// Whether `value` is a secure-context URL: `https` on any host, or `http` only
+// on a loopback host. Everything else — a non-`http(s)` scheme (e.g. `ftp:`) or
+// plain `http` on a remote host — is rejected. Shared with `UrlTransport` and
+// re-asserted at the navigation sink, so a URL restored from storage on the
+// return load is re-checked, not just the one the constructor validated.
+export const isSecureContextUrl = (value: string): boolean => {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' || (url.protocol === 'http:' && isLoopbackHost(url.hostname));
+  } catch {
+    return false;
+  }
+};
+
 /** Options for creating a {@link UrlFlow}. */
 export interface UrlFlowOptions {
   /** The signer's ICRC-167 transport URL. */
@@ -292,6 +314,12 @@ export class UrlFlow {
       callback: this.#options.callbackUrl,
       state,
     });
+    // Re-assert the scheme at the navigation sink: `#url` may have been restored
+    // from storage (`stored.url`) on the return load, which the constructor's
+    // secure-context check never saw.
+    if (!isSecureContextUrl(this.#url)) {
+      throw new Error('Refusing to navigate to a non-secure-context signer URL');
+    }
     this.#options.location.assign(`${this.#url}#${fragment.toString()}`);
   }
 
