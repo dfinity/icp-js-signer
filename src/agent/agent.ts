@@ -65,6 +65,11 @@ export interface SignerAgentOptions<T extends Transport = Transport> {
    * @default A new HttpAgent connected to the IC mainnet.
    */
   agent?: HttpAgent;
+  /**
+   * Source of randomness for nonces bound to upgraded query calls.
+   * @default globalThis.crypto
+   */
+  crypto?: Pick<Crypto, 'getRandomValues'>;
 }
 
 /**
@@ -132,6 +137,7 @@ export class SignerAgent<T extends Transport = Transport> implements Agent {
     return new SignerAgent({
       ...options,
       agent: options.agent ?? (await HttpAgent.create()),
+      crypto: options.crypto ?? globalThis.crypto,
     }) as SignerAgent<T>;
   }
 
@@ -145,6 +151,7 @@ export class SignerAgent<T extends Transport = Transport> implements Agent {
     return new SignerAgent({
       ...options,
       agent: options.agent ?? HttpAgent.createSync(),
+      crypto: options.crypto ?? globalThis.crypto,
     }) as SignerAgent<T>;
   }
 
@@ -306,7 +313,7 @@ export class SignerAgent<T extends Transport = Transport> implements Agent {
       methodName: options.methodName,
       arg: options.arg,
       effectiveCanisterId: canisterId,
-      nonce: crypto.getRandomValues(new Uint8Array(32)),
+      nonce: this.#options.crypto.getRandomValues(new Uint8Array(32)),
     });
     return {
       requestId,
