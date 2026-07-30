@@ -1,6 +1,13 @@
 import type { Channel, JsonRpcRequest, JsonRpcResponse } from '../transport.js';
 import type { UrlFlow } from './urlFlow.js';
 
+// A content fingerprint (method + params) of a request. The journal is still
+// addressed by call order; this only guards a replay: if the request at a given
+// call-order slot no longer matches the one recorded there before the redirect,
+// the caller diverged and we throw rather than hand back another call's response.
+const requestKey = (request: JsonRpcRequest): string =>
+  JSON.stringify({ method: request.method, params: request.params ?? null });
+
 /**
  * A {@link Channel} implementation for the ICRC-167 browser URL transport,
  * driving a shared {@link UrlFlow} journal.
@@ -73,10 +80,24 @@ export class UrlChannel implements Channel {
     }
 
     const index = this.#flow.next();
+    const key = requestKey(request);
     const cached = this.#flow.get(index);
     if (cached !== undefined) {
-      // Replay: emit the stored response, stamped with the id the caller used
-      // for this call (the id when it was first sent may have differed).
+      // Replay. Call order picks the slot; the content fingerprint guards it —
+      // if the request here differs from the one journaled at this slot before
+      // the redirect, the caller issued a different (skipped/reordered) request
+      // than last load, so fail loud instead of handing back another call's
+      // response. A `undefined` recorded key means this slot held a `memoize`
+      // step, not a request — also a divergence.
+      if (this.#flow.recordedRequestKey(index) !== key) {
+        return Promise.reject(
+          new Error(
+            'URL transport replay diverged: the request at this step differs from the one sent before the redirect. Issue the same requests in the same order on every load.',
+          ),
+        );
+      }
+      // Emit the stored response, stamped with the id the caller used for this
+      // call (the id when it was first sent may have differed).
       const response = { ...(cached as JsonRpcResponse), id: request.id ?? null };
       queueMicrotask(() => {
         for (const listener of this.#responseListeners) {
@@ -86,7 +107,7 @@ export class UrlChannel implements Channel {
       return Promise.resolve();
     }
 
-    this.#flow.request(index, request);
+    this.#flow.request(index, request, key);
     return Promise.resolve();
   }
 

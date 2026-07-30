@@ -97,6 +97,9 @@ describe('UrlChannel', () => {
       [KEY]: JSON.stringify({
         createdAt: 1000,
         results: {},
+        // The fingerprint the first load recorded for the request at slot 0;
+        // the replayed call must match it or the divergence guard throws.
+        requestKeys: { 0: JSON.stringify({ method: 'icrc27_accounts', params: null }) },
         pending: { state: 'S', requests: [{ index: 0, id: 'req' }] },
       }),
     });
@@ -112,6 +115,63 @@ describe('UrlChannel', () => {
 
     expect(location.assign).not.toHaveBeenCalled();
     expect(listener).toHaveBeenCalledWith({ ...returned, id: 7 }); // re-stamped with this call's id
+  });
+
+  it('gives two identical no-nonce calls their own responses by call order', async () => {
+    // Two byte-identical requests (same method + params, different ids) share a
+    // content fingerprint but not a call-order slot, so each keeps its own
+    // response — the collision the content-keyed journal silently conflated.
+    const key = JSON.stringify({ method: 'icrc27_accounts', params: null });
+    const r1 = response(1, { accounts: ['a'] });
+    const r2 = response(2, { accounts: ['b'] });
+    const storage = createStorage({
+      [KEY]: JSON.stringify({
+        createdAt: 1000,
+        results: {},
+        requestKeys: { 0: key, 1: key },
+        pending: {
+          state: 'S',
+          requests: [
+            { index: 0, id: 1 },
+            { index: 1, id: 2 },
+          ],
+        },
+      }),
+    });
+    const location = createLocation(
+      `#${new URLSearchParams({ message: JSON.stringify([r1, r2]), state: 'S' }).toString()}`,
+    );
+    const { channel } = createChannel({ storage, location });
+    const seen: JsonRpcResponse[] = [];
+    channel.addEventListener('response', r => seen.push(r));
+
+    await channel.send({ jsonrpc: '2.0', id: 1, method: 'icrc27_accounts' });
+    await channel.send({ jsonrpc: '2.0', id: 2, method: 'icrc27_accounts' });
+    await microtask();
+
+    // Distinct responses, not r2 handed to both.
+    expect(seen).toEqual([r1, r2]);
+  });
+
+  it('rejects a replay whose request diverges from the one journaled at its slot', async () => {
+    const returned = response('req', { accounts: [] });
+    const storage = createStorage({
+      [KEY]: JSON.stringify({
+        createdAt: 1000,
+        results: {},
+        requestKeys: { 0: JSON.stringify({ method: 'icrc27_accounts', params: null }) },
+        pending: { state: 'S', requests: [{ index: 0, id: 'req' }] },
+      }),
+    });
+    const location = createLocation(
+      `#${new URLSearchParams({ message: JSON.stringify(returned), state: 'S' }).toString()}`,
+    );
+    const { channel } = createChannel({ storage, location });
+
+    // The return load issues a different request at slot 0 than the first load.
+    await expect(
+      channel.send({ jsonrpc: '2.0', id: 9, method: 'icrc34_delegation' }),
+    ).rejects.toThrow(/diverged/);
   });
 
   it('starts fresh on a bare load, not replaying a leftover journal', async () => {
