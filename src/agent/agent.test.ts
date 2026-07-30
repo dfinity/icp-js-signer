@@ -212,7 +212,7 @@ describe('SignerAgent', () => {
         sender: ACCOUNT,
         method: METHOD_NAME,
         arg: ARG,
-        nonce: expect.any(Uint8Array),
+        nonce: undefined,
       });
       expect(result.response.ok).toBe(true);
       expect(result.response.status).toBe(202);
@@ -254,10 +254,10 @@ describe('SignerAgent', () => {
       await expect(agent.call(CANISTER_ID, CALL_FIELDS)).rejects.toThrow(SignerAgentError);
     });
 
-    it('rejects a content map whose nonce does not match the call (replay defence)', async () => {
-      // A replayed {contentMap, certificate} from a prior identical call carries
-      // that call's nonce (here, none), which won't match the fresh nonce this
-      // call sends — so the content map is rejected rather than accepted as fresh.
+    it('rejects a content map missing a supplied nonce (replay defence)', async () => {
+      // When the caller supplies a nonce, a replayed {contentMap, certificate}
+      // from a prior call under a different (or no) nonce won't carry it — so the
+      // content map is rejected rather than accepted as fresh.
       const { signer } = createMockSigner({
         contentMap: buildContentMap(), // no nonce echoed
         certificate: RAW_CERTIFICATE,
@@ -268,7 +268,24 @@ describe('SignerAgent', () => {
         agent: createMockHttpAgent(),
       });
 
-      await expect(agent.call(CANISTER_ID, CALL_FIELDS)).rejects.toThrow(SignerAgentError);
+      await expect(
+        agent.call(CANISTER_ID, { ...CALL_FIELDS, nonce: new Uint8Array([9, 9, 9]) }),
+      ).rejects.toThrow(SignerAgentError);
+    });
+
+    it('accepts a content map that echoes the supplied nonce', async () => {
+      const { signer } = createMockSigner(); // default mock echoes the call nonce
+      const agent = SignerAgent.createSync({
+        signer,
+        account: ACCOUNT,
+        agent: createMockHttpAgent(),
+      });
+
+      const result = await agent.call(CANISTER_ID, {
+        ...CALL_FIELDS,
+        nonce: new Uint8Array([9, 9, 9]),
+      });
+      expect(result.response.ok).toBe(true);
     });
 
     it('rejects if certificate validation fails', async () => {

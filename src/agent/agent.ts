@@ -160,17 +160,6 @@ export class SignerAgent<T extends Transport = Transport> implements Agent {
   async #sendAndVerify(canisterId: Principal, fields: CallOptions): Promise<VerifiedCall> {
     await this.#options.signer.openChannel();
 
-    // Bind a nonce to every call (a fresh one when the caller supplied none, so
-    // the query-upgraded-to-call path is covered too). Without this, a signer
-    // could replay a previously-obtained {contentMap, certificate} for an
-    // identical prior call (same type/canister/method/arg/sender): the old
-    // content map passes the other checks, its request_id re-derives, and the
-    // old certificate genuinely certifies a reply at that id — accepted as fresh
-    // within the certificate's 5-minute window. A unique nonce per call makes
-    // each request_id unique and lets the verification below reject a mismatch.
-    // (HttpAgent likewise sends a fresh nonce per call.)
-    const nonce = fields.nonce ?? globalThis.crypto.getRandomValues(new Uint8Array(32));
-
     // Queue calls to ensure sequential execution through the signer
     const response = await new Promise<Awaited<ReturnType<Signer['callCanister']>>>(
       (resolve, reject) => {
@@ -181,7 +170,7 @@ export class SignerAgent<T extends Transport = Transport> implements Agent {
               sender: this.#options.account,
               method: fields.methodName,
               arg: fields.arg,
-              nonce,
+              nonce: fields.nonce,
             })
             .then(resolve, reject),
         );
@@ -206,8 +195,13 @@ export class SignerAgent<T extends Transport = Transport> implements Agent {
       fields.methodName === requestBody.method_name &&
       uint8Equals(fields.arg, requestBody.arg) &&
       this.#options.account.toText() === Principal.from(requestBody.sender).toText() &&
-      requestBody.nonce !== undefined &&
-      uint8Equals(new Uint8Array(nonce), new Uint8Array(requestBody.nonce));
+      // Bind the nonce ONLY when the caller supplied one: a signer must not
+      // replay a prior {contentMap, certificate} for the same call under a
+      // different (or no) nonce. When no nonce was requested we don't require
+      // one, so a signer that returns a content map without a nonce still works.
+      (fields.nonce === undefined ||
+        (requestBody.nonce !== undefined &&
+          uint8Equals(new Uint8Array(fields.nonce), new Uint8Array(requestBody.nonce))));
     if (!contentMapMatchesRequest) {
       throw new SignerAgentError(INVALID_RESPONSE_MESSAGE);
     }
