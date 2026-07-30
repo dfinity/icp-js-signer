@@ -195,10 +195,6 @@ export class SignerAgent<T extends Transport = Transport> implements Agent {
       fields.methodName === requestBody.method_name &&
       uint8Equals(fields.arg, requestBody.arg) &&
       this.#options.account.toText() === Principal.from(requestBody.sender).toText() &&
-      // Bind the nonce ONLY when the caller supplied one: a signer must not
-      // replay a prior {contentMap, certificate} for the same call under a
-      // different (or no) nonce. When no nonce was requested we don't require
-      // one, so a signer that returns a content map without a nonce still works.
       (fields.nonce === undefined ||
         (requestBody.nonce !== undefined &&
           uint8Equals(new Uint8Array(fields.nonce), new Uint8Array(requestBody.nonce))));
@@ -304,10 +300,13 @@ export class SignerAgent<T extends Transport = Transport> implements Agent {
     _identity?: Identity | Promise<Identity>,
   ): Promise<ApiQueryResponse> {
     canisterId = Principal.from(canisterId);
+    // The signer serves this as an update call, so bind it to a fresh nonce:
+    // a signer can't replay a prior {contentMap, certificate} for the same read.
     const { requestId, reply } = await this.#sendAndVerify(canisterId, {
       methodName: options.methodName,
       arg: options.arg,
       effectiveCanisterId: canisterId,
+      nonce: crypto.getRandomValues(new Uint8Array(32)),
     });
     return {
       requestId,

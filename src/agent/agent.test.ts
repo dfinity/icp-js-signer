@@ -5,6 +5,7 @@ import {
   LookupPathStatus,
   SubmitRequestType,
 } from '@icp-sdk/core/agent';
+import { uint8Equals } from '@icp-sdk/core/candid';
 import { Principal } from '@icp-sdk/core/principal';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Signer } from '../signer.js';
@@ -338,6 +339,26 @@ describe('SignerAgent', () => {
         throw new Error('unexpected');
       }
       expect(result.reply.arg).toEqual(REPLY);
+    });
+
+    it('binds the upgraded call to a fresh nonce', async () => {
+      const { signer } = createMockSigner();
+      const agent = SignerAgent.createSync({
+        signer,
+        account: ACCOUNT,
+        agent: createMockHttpAgent(),
+      });
+
+      await agent.query(CANISTER_ID, { methodName: METHOD_NAME, arg: ARG });
+      await agent.query(CANISTER_ID, { methodName: METHOD_NAME, arg: ARG });
+
+      const calls = (signer.callCanister as unknown as ReturnType<typeof vi.fn>).mock.calls;
+      const nonce1 = calls[0][0].nonce as Uint8Array;
+      const nonce2 = calls[1][0].nonce as Uint8Array;
+      expect(nonce1).toBeInstanceOf(Uint8Array);
+      expect(nonce1).toHaveLength(32);
+      // Fresh per call — no two reads share a nonce, so neither can be replayed.
+      expect(uint8Equals(nonce1, nonce2)).toBe(false);
     });
   });
 
