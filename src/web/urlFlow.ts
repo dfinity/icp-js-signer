@@ -51,11 +51,8 @@ interface StoredFlow {
    */
   asyncSlots?: number[];
   /**
-   * Content fingerprint (method + params) of the request journaled at each
-   * call-order slot. Not used to address the journal — call order still does
-   * that — but to detect divergence: on a replay load a request whose content
-   * no longer matches the one recorded at its slot throws instead of being
-   * silently handed another call's response.
+   * Content fingerprint per call-order slot, checked on a replay load to reject
+   * a request that no longer matches the one recorded at its slot.
    */
   requestKeys?: Record<number, string>;
   pending?: { state: string; requests: PendingRequest[] };
@@ -234,6 +231,14 @@ export class UrlFlow {
     const index = this.next();
     const cached = this.get(index);
     if (cached !== undefined) {
+      // A recorded request key at this slot means a request owned it before the
+      // redirect; a memoize step landing here is a divergence, and the cached
+      // value is a response object, not this producer's value.
+      if (this.#requestKeys[index] !== undefined) {
+        throw new Error(
+          'URL transport replay diverged: a memoize step is at a slot that held a request before the redirect. Issue the same requests and memoize steps in the same order on every load.',
+        );
+      }
       // Replay: mirror the producer's original shape. An async slot resolves to
       // a promise (even though the journaled value is already resolved) so a
       // promise-returning memoize never hands back a bare value on the second

@@ -1,10 +1,8 @@
 import type { Channel, JsonRpcRequest, JsonRpcResponse } from '../transport.js';
 import type { UrlFlow } from './urlFlow.js';
 
-// A content fingerprint (method + params) of a request. The journal is still
-// addressed by call order; this only guards a replay: if the request at a given
-// call-order slot no longer matches the one recorded there before the redirect,
-// the caller diverged and we throw rather than hand back another call's response.
+// Content fingerprint (method + params) of a request, checked on replay to
+// detect a request landing on a call-order slot whose original differs.
 const requestKey = (request: JsonRpcRequest): string =>
   JSON.stringify({ method: request.method, params: request.params ?? null });
 
@@ -83,12 +81,8 @@ export class UrlChannel implements Channel {
     const key = requestKey(request);
     const cached = this.#flow.get(index);
     if (cached !== undefined) {
-      // Replay. Call order picks the slot; the content fingerprint guards it —
-      // if the request here differs from the one journaled at this slot before
-      // the redirect, the caller issued a different (skipped/reordered) request
-      // than last load, so fail loud instead of handing back another call's
-      // response. A `undefined` recorded key means this slot held a `memoize`
-      // step, not a request — also a divergence.
+      // Call order picks the slot; the fingerprint guards it. A mismatch — or an
+      // undefined recorded key (the slot held a `memoize` step) — is a divergence.
       if (this.#flow.recordedRequestKey(index) !== key) {
         return Promise.reject(
           new Error(
@@ -96,8 +90,7 @@ export class UrlChannel implements Channel {
           ),
         );
       }
-      // Emit the stored response, stamped with the id the caller used for this
-      // call (the id when it was first sent may have differed).
+      // Re-stamp with this call's id; it may differ from the original send.
       const response = { ...(cached as JsonRpcResponse), id: request.id ?? null };
       queueMicrotask(() => {
         for (const listener of this.#responseListeners) {

@@ -97,8 +97,7 @@ describe('UrlChannel', () => {
       [KEY]: JSON.stringify({
         createdAt: 1000,
         results: {},
-        // The fingerprint the first load recorded for the request at slot 0;
-        // the replayed call must match it or the divergence guard throws.
+        // The fingerprint the first load recorded at slot 0.
         requestKeys: { 0: JSON.stringify({ method: 'icrc27_accounts', params: null }) },
         pending: { state: 'S', requests: [{ index: 0, id: 'req' }] },
       }),
@@ -118,9 +117,6 @@ describe('UrlChannel', () => {
   });
 
   it('gives two identical no-nonce calls their own responses by call order', async () => {
-    // Two byte-identical requests (same method + params, different ids) share a
-    // content fingerprint but not a call-order slot, so each keeps its own
-    // response — the collision the content-keyed journal silently conflated.
     const key = JSON.stringify({ method: 'icrc27_accounts', params: null });
     const r1 = response(1, { accounts: ['a'] });
     const r2 = response(2, { accounts: ['b'] });
@@ -149,7 +145,6 @@ describe('UrlChannel', () => {
     await channel.send({ jsonrpc: '2.0', id: 2, method: 'icrc27_accounts' });
     await microtask();
 
-    // Distinct responses, not r2 handed to both.
     expect(seen).toEqual([r1, r2]);
   });
 
@@ -168,7 +163,6 @@ describe('UrlChannel', () => {
     );
     const { channel } = createChannel({ storage, location });
 
-    // The return load issues a different request at slot 0 than the first load.
     await expect(
       channel.send({ jsonrpc: '2.0', id: 9, method: 'icrc34_delegation' }),
     ).rejects.toThrow(/diverged/);
