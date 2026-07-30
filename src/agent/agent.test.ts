@@ -81,8 +81,8 @@ const createMockSigner = (
   const signer = {
     openChannel: vi.fn(() => Promise.resolve(mockChannel)),
     closeChannel: vi.fn(() => Promise.resolve()),
-    callCanister: vi.fn(
-      (): Promise<typeof callCanisterResult> => Promise.resolve(callCanisterResult),
+    callCanister: vi.fn((): Promise<typeof callCanisterResult> =>
+      Promise.resolve(callCanisterResult),
     ),
     supportedStandards: vi.fn(),
     accounts: vi.fn(),
@@ -306,9 +306,12 @@ describe('SignerAgent', () => {
       const agent = await createAgent();
       await agent.call(CANISTER_ID, CALL_FIELDS);
 
-      const result = await agent.readState(CANISTER_ID, {
-        paths: [[new TextEncoder().encode('request_status'), REQUEST_ID]],
-      });
+      const result = await agent.readState(
+        { canisterId: CANISTER_ID },
+        {
+          paths: [[new TextEncoder().encode('request_status'), REQUEST_ID]],
+        },
+      );
 
       expect(result.certificate).toEqual(RAW_CERTIFICATE);
     });
@@ -317,21 +320,27 @@ describe('SignerAgent', () => {
       const agent = await createAgent();
       await agent.call(CANISTER_ID, CALL_FIELDS);
 
-      await agent.readState(CANISTER_ID, {
-        paths: [[new TextEncoder().encode('request_status'), REQUEST_ID]],
-      });
+      await agent.readState(
+        { canisterId: CANISTER_ID },
+        {
+          paths: [[new TextEncoder().encode('request_status'), REQUEST_ID]],
+        },
+      );
 
       await expect(
-        agent.readState(CANISTER_ID, {
-          paths: [[new TextEncoder().encode('request_status'), REQUEST_ID]],
-        }),
+        agent.readState(
+          { canisterId: CANISTER_ID },
+          {
+            paths: [[new TextEncoder().encode('request_status'), REQUEST_ID]],
+          },
+        ),
       ).rejects.toThrow('Certificate could not be found');
     });
 
     it('rejects unsupported paths', async () => {
       const agent = await createAgent();
 
-      await expect(agent.readState(CANISTER_ID, { paths: [] })).rejects.toThrow(
+      await expect(agent.readState({ canisterId: CANISTER_ID }, { paths: [] })).rejects.toThrow(
         'Given paths are not supported',
       );
     });

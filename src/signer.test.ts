@@ -1,3 +1,4 @@
+import { Ed25519KeyIdentity } from '@icp-sdk/core/identity';
 import { Principal } from '@icp-sdk/core/principal';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Signer, SignerError, type SignerRequestTransformFn } from './signer.js';
@@ -649,6 +650,49 @@ describe('Signer', () => {
       const standards = await signer.getSupportedStandards();
 
       expect(standards).toEqual([{ name: 'correct', url: '' }]);
+    });
+  });
+
+  describe('requestDelegation', () => {
+    const b64 = (bytes: Uint8Array): string => btoa(String.fromCharCode(...bytes));
+
+    const respondWithDelegation =
+      (delegation: Record<string, unknown>) => (req: JsonRpcRequest) => ({
+        jsonrpc: '2.0' as const,
+        id: req.id as string,
+        result: {
+          publicKey: b64(new Uint8Array([7, 8, 9])),
+          signerDelegation: [{ delegation, signature: b64(new Uint8Array([4, 5, 6])) }],
+        },
+      });
+
+    it('round-trips the delegation permissions scope (core v6)', async () => {
+      const publicKey = Ed25519KeyIdentity.generate().getPublicKey();
+      const signer = createSigner(
+        respondWithDelegation({
+          pubkey: b64(new Uint8Array([1, 2, 3])),
+          expiration: '1000000',
+          permissions: 'queries',
+        }),
+      );
+
+      const chain = await signer.requestDelegation({ publicKey });
+
+      expect(chain.delegations[0].delegation.permissions).toBe('queries');
+    });
+
+    it('leaves permissions undefined when the signer omits them', async () => {
+      const publicKey = Ed25519KeyIdentity.generate().getPublicKey();
+      const signer = createSigner(
+        respondWithDelegation({
+          pubkey: b64(new Uint8Array([1, 2, 3])),
+          expiration: '1000000',
+        }),
+      );
+
+      const chain = await signer.requestDelegation({ publicKey });
+
+      expect(chain.delegations[0].delegation.permissions).toBeUndefined();
     });
   });
 });

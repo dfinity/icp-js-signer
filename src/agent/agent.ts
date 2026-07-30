@@ -9,6 +9,7 @@ import {
   HttpAgent,
   IC_ROOT_KEY,
   type Identity,
+  type InputTargetPrincipal,
   JSON_KEY_EXPIRY,
   LookupPathStatus,
   type QueryFields,
@@ -340,13 +341,13 @@ export class SignerAgent<T extends Transport = Transport> implements Agent {
    *
    * Only supports `request_status` paths for request IDs that were
    * returned by a prior {@link call}, {@link update}, or {@link query}.
-   * @param _canisterId - The target canister principal (unused).
+   * @param _effectiveTarget - The effective target of the read state request (unused).
    * @param options - The read state options containing paths to look up.
    * @param _identity - The identity to use (unused).
    * @param _request - The request object (unused).
    */
   readState(
-    _canisterId: Principal | string,
+    _effectiveTarget: InputTargetPrincipal,
     options: ReadStateOptions,
     _identity?: Identity | Promise<Identity>,
     _request?: unknown,
