@@ -25,8 +25,9 @@ const CALL_FIELDS: CallOptions = {
   effectiveCanisterId: CANISTER_ID,
 };
 
-// Build a valid CBOR-encoded content map that decodeCallRequest will parse
-const buildContentMap = () => {
+// Build a valid CBOR-encoded content map that decodeCallRequest will parse.
+// Echoes the call nonce so the agent's nonce-binding verification matches.
+const buildContentMap = (nonce?: Uint8Array) => {
   return Cbor.encode({
     request_type: SubmitRequestType.Call,
     canister_id: CANISTER_ID.toUint8Array(),
@@ -34,6 +35,7 @@ const buildContentMap = () => {
     arg: ARG,
     sender: ACCOUNT.toUint8Array(),
     ingress_expiry: BigInt(0),
+    ...(nonce !== undefined ? { nonce } : {}),
   });
 };
 
@@ -65,12 +67,10 @@ vi.mock('@icp-sdk/core/agent', async importOriginal => {
   };
 });
 
-const createMockSigner = (
-  callCanisterResult = {
-    contentMap: buildContentMap(),
-    certificate: RAW_CERTIFICATE,
-  },
-) => {
+const createMockSigner = (callCanisterResult?: {
+  contentMap: Uint8Array;
+  certificate: typeof RAW_CERTIFICATE;
+}) => {
   const mockChannel: Channel = {
     closed: false,
     addEventListener: () => () => {},
@@ -81,8 +81,13 @@ const createMockSigner = (
   const signer = {
     openChannel: vi.fn(() => Promise.resolve(mockChannel)),
     closeChannel: vi.fn(() => Promise.resolve()),
-    callCanister: vi.fn(
-      (): Promise<typeof callCanisterResult> => Promise.resolve(callCanisterResult),
+    callCanister: vi.fn((call: any) =>
+      Promise.resolve(
+        callCanisterResult ?? {
+          contentMap: buildContentMap(call?.nonce as Uint8Array | undefined),
+          certificate: RAW_CERTIFICATE,
+        },
+      ),
     ),
     supportedStandards: vi.fn(),
     accounts: vi.fn(),
@@ -207,6 +212,7 @@ describe('SignerAgent', () => {
         sender: ACCOUNT,
         method: METHOD_NAME,
         arg: ARG,
+        nonce: undefined,
       });
       expect(result.response.ok).toBe(true);
       expect(result.response.status).toBe(202);
@@ -246,6 +252,40 @@ describe('SignerAgent', () => {
       });
 
       await expect(agent.call(CANISTER_ID, CALL_FIELDS)).rejects.toThrow(SignerAgentError);
+    });
+
+    it('rejects a content map missing a supplied nonce (replay defence)', async () => {
+      // When the caller supplies a nonce, a replayed {contentMap, certificate}
+      // from a prior call under a different (or no) nonce won't carry it — so the
+      // content map is rejected rather than accepted as fresh.
+      const { signer } = createMockSigner({
+        contentMap: buildContentMap(), // no nonce echoed
+        certificate: RAW_CERTIFICATE,
+      });
+      const agent = SignerAgent.createSync({
+        signer,
+        account: ACCOUNT,
+        agent: createMockHttpAgent(),
+      });
+
+      await expect(
+        agent.call(CANISTER_ID, { ...CALL_FIELDS, nonce: new Uint8Array([9, 9, 9]) }),
+      ).rejects.toThrow(SignerAgentError);
+    });
+
+    it('accepts a content map that echoes the supplied nonce', async () => {
+      const { signer } = createMockSigner(); // default mock echoes the call nonce
+      const agent = SignerAgent.createSync({
+        signer,
+        account: ACCOUNT,
+        agent: createMockHttpAgent(),
+      });
+
+      const result = await agent.call(CANISTER_ID, {
+        ...CALL_FIELDS,
+        nonce: new Uint8Array([9, 9, 9]),
+      });
+      expect(result.response.ok).toBe(true);
     });
 
     it('rejects if certificate validation fails', async () => {
@@ -299,6 +339,32 @@ describe('SignerAgent', () => {
       }
       expect(result.reply.arg).toEqual(REPLY);
     });
+
+    it('binds the upgraded call to a fresh nonce', async () => {
+      const { signer } = createMockSigner();
+      // Deterministic RNG: exact assertion, and proves query() draws the nonce
+      // from the injected crypto rather than the global.
+      let fill = 0;
+      const crypto = {
+        getRandomValues: (array: Uint8Array) => {
+          array.fill(++fill);
+          return array;
+        },
+      } as Pick<Crypto, 'getRandomValues'>;
+      const agent = SignerAgent.createSync({
+        signer,
+        account: ACCOUNT,
+        agent: createMockHttpAgent(),
+        crypto,
+      });
+
+      await agent.query(CANISTER_ID, { methodName: METHOD_NAME, arg: ARG });
+      await agent.query(CANISTER_ID, { methodName: METHOD_NAME, arg: ARG });
+
+      const calls = (signer.callCanister as unknown as ReturnType<typeof vi.fn>).mock.calls;
+      expect(calls[0][0].nonce).toEqual(new Uint8Array(32).fill(1));
+      expect(calls[1][0].nonce).toEqual(new Uint8Array(32).fill(2));
+    });
   });
 
   describe('readState', () => {
@@ -342,7 +408,7 @@ describe('SignerAgent', () => {
       const callOrder: number[] = [];
 
       const { signer } = createMockSigner();
-      (signer.callCanister as any).mockImplementation(async () => {
+      (signer.callCanister as any).mockImplementation(async (call: any) => {
         const index = callOrder.length;
         callOrder.push(index);
         // Second call takes longer
@@ -350,7 +416,7 @@ describe('SignerAgent', () => {
           await new Promise(r => setTimeout(r, 10));
         }
         return {
-          contentMap: buildContentMap(),
+          contentMap: buildContentMap(call?.nonce as Uint8Array | undefined),
           certificate: RAW_CERTIFICATE,
         };
       });

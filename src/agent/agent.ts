@@ -65,6 +65,11 @@ export interface SignerAgentOptions<T extends Transport = Transport> {
    * @default A new HttpAgent connected to the IC mainnet.
    */
   agent?: HttpAgent;
+  /**
+   * Source of randomness for nonces bound to upgraded query calls.
+   * @default globalThis.crypto
+   */
+  crypto?: Pick<Crypto, 'getRandomValues'>;
 }
 
 /**
@@ -132,6 +137,7 @@ export class SignerAgent<T extends Transport = Transport> implements Agent {
     return new SignerAgent({
       ...options,
       agent: options.agent ?? (await HttpAgent.create()),
+      crypto: options.crypto ?? globalThis.crypto,
     }) as SignerAgent<T>;
   }
 
@@ -145,6 +151,7 @@ export class SignerAgent<T extends Transport = Transport> implements Agent {
     return new SignerAgent({
       ...options,
       agent: options.agent ?? HttpAgent.createSync(),
+      crypto: options.crypto ?? globalThis.crypto,
     }) as SignerAgent<T>;
   }
 
@@ -194,7 +201,10 @@ export class SignerAgent<T extends Transport = Transport> implements Agent {
       canisterId.toText() === requestBody.canister_id.toText() &&
       fields.methodName === requestBody.method_name &&
       uint8Equals(fields.arg, requestBody.arg) &&
-      this.#options.account.toText() === Principal.from(requestBody.sender).toText();
+      this.#options.account.toText() === Principal.from(requestBody.sender).toText() &&
+      (fields.nonce === undefined ||
+        (requestBody.nonce !== undefined &&
+          uint8Equals(new Uint8Array(fields.nonce), new Uint8Array(requestBody.nonce))));
     if (!contentMapMatchesRequest) {
       throw new SignerAgentError(INVALID_RESPONSE_MESSAGE);
     }
@@ -297,10 +307,13 @@ export class SignerAgent<T extends Transport = Transport> implements Agent {
     _identity?: Identity | Promise<Identity>,
   ): Promise<ApiQueryResponse> {
     canisterId = Principal.from(canisterId);
+    // The signer serves this as an update call, so bind it to a fresh nonce:
+    // a signer can't replay a prior {contentMap, certificate} for the same read.
     const { requestId, reply } = await this.#sendAndVerify(canisterId, {
       methodName: options.methodName,
       arg: options.arg,
       effectiveCanisterId: canisterId,
+      nonce: this.#options.crypto.getRandomValues(new Uint8Array(32)),
     });
     return {
       requestId,
