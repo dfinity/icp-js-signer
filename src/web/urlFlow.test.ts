@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { JsonRpcResponse } from '../transport.js';
-import { UrlFlow, type UrlFlowOptions } from './urlFlow.js';
+import { isSecureContextUrl, UrlFlow, type UrlFlowOptions } from './urlFlow.js';
 
 const URL_ = 'https://signer.example.com/icrc-167';
 const CALLBACK = 'https://relying.example.com/signer-callback';
@@ -71,6 +71,23 @@ const readStored = (storage: Storage) => JSON.parse(storage.getItem(KEY) ?? 'nul
 const assignedFragment = (location: MockLocation) =>
   new URLSearchParams(new URL(location.assign.mock.calls[0][0]).hash.slice(1));
 const request = (id: number, method: string) => ({ jsonrpc: '2.0' as const, id, method });
+
+describe('isSecureContextUrl', () => {
+  it.each([
+    ['https://signer.example.com/x', true],
+    ['http://localhost/x', true],
+    ['http://app.localhost/x', true],
+    ['http://127.0.0.1/x', true],
+    ['http://127.1/x', true], // IPv4 shorthand → new URL() normalizes to 127.0.0.1
+    ['http://[::1]/x', true],
+    ['http://signer.example.com/x', false], // plain http on a remote host
+    ['http://127.999.999.999/x', false], // invalid octets → new URL() throws
+    ['ftp://127.0.0.1/x', false], // non-http(s) scheme
+    ['not a url', false],
+  ] as const)('%s → %s', (url, expected) => {
+    expect(isSecureContextUrl(url)).toBe(expected);
+  });
+});
 
 describe('UrlFlow', () => {
   it('hands out sequential call-order slots', () => {
@@ -315,6 +332,47 @@ describe('UrlFlow', () => {
     expect(location.assign).toHaveBeenCalledOnce();
     expect(location.assign.mock.calls[0][0]).toContain(URL_);
     expect(location.assign.mock.calls[0][0]).not.toContain('default.example.com');
+  });
+
+  it('refuses to navigate a second hop to a non-secure-context url restored from storage', async () => {
+    // A persisted flow whose stored redirect target is a remote http URL — the
+    // constructor's secure-context check never saw it, so the sink must re-check.
+    const storage = createStorage({
+      [KEY]: JSON.stringify({
+        createdAt: NOW,
+        url: 'http://signer.example.com/evil',
+        results: {},
+        pending: { state: 'S', requests: [{ index: 0, id: 1 }] },
+      }),
+    });
+    const location = createLocation(
+      hashFor({ message: JSON.stringify(response(1, { ok: true })), state: 'S' }),
+    );
+    const flow = new UrlFlow({
+      url: 'https://default.example.com/',
+      callbackUrl: CALLBACK,
+      storage,
+      storageKey: KEY,
+      flowTimeout: 1_000_000,
+      location: location as UrlFlowOptions['location'],
+      history: { replaceState: vi.fn() },
+      crypto: { randomUUID: () => 'S2' } as Pick<Crypto, 'randomUUID'>,
+      now: () => NOW,
+    });
+
+    // The sink throws inside the flush timer, surfacing as an uncaughtException.
+    const errors: unknown[] = [];
+    const onError = (error: unknown) => errors.push(error);
+    process.on('uncaughtException', onError);
+    try {
+      flow.request(flow.next(), request(2, 'icrc34_delegation')); // second hop
+      await tick();
+    } finally {
+      process.off('uncaughtException', onError);
+    }
+
+    expect(location.assign).not.toHaveBeenCalled();
+    expect(errors.map(String).join()).toMatch(/non-secure-context/);
   });
 
   it('memoize returns synchronously for a sync producer and replays it synchronously', async () => {

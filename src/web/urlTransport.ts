@@ -1,6 +1,6 @@
 import type { Transport } from '../transport.js';
 import { UrlChannel } from './urlChannel.js';
-import { UrlFlow } from './urlFlow.js';
+import { UrlFlow, isSecureContextUrl } from './urlFlow.js';
 
 /** Error thrown by {@link UrlTransport} for transport-level failures. */
 export class UrlTransportError extends Error {}
@@ -57,19 +57,6 @@ export interface UrlTransportOptions {
    */
   crypto?: Pick<Crypto, 'randomUUID'>;
 }
-
-const isSecureContextUrl = (value: string): boolean => {
-  try {
-    const url = new URL(value);
-    return (
-      url.protocol === 'https:' ||
-      url.hostname === '127.0.0.1' ||
-      url.hostname.split('.').slice(-1)[0] === 'localhost'
-    );
-  } catch {
-    return false;
-  }
-};
 
 /**
  * ICRC-167 browser URL transport for communicating with web-based signers via
