@@ -188,6 +188,21 @@ describe('UrlFlow', () => {
     expect(flow.get(1)).toEqual(resp); // slot 1 absorbed from the return
   });
 
+  it('rejects a memoize step that lands on a slot that held a request', async () => {
+    const storage = createStorage();
+
+    // Load 1: a request occupies slot 0, then navigates.
+    const first = createFlow({ storage, states: ['S'] });
+    first.flow.request(first.flow.next(), request(1, 'icrc34_delegation'), 'req-key');
+    await tick();
+
+    // Load 2: memoize now lands on slot 0 — the guard rejects it.
+    const resp = response(1, { ok: true });
+    const location = createLocation(hashFor({ message: JSON.stringify(resp), state: 'S' }));
+    const { flow } = createFlow({ storage, location });
+    expect(() => flow.memoize(vi.fn())).toThrow(/diverged/);
+  });
+
   it('absorbs a batch return by id and strips the fragment', () => {
     const respA = response(1, { a: 1 });
     const respB = response(2, { b: 2 });

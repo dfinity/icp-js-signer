@@ -50,6 +50,11 @@ interface StoredFlow {
    * promise-returning `memoize` would hand back a bare value on the second run.
    */
   asyncSlots?: number[];
+  /**
+   * Content fingerprint per call-order slot, checked on a replay load to reject
+   * a request that no longer matches the one recorded at its slot.
+   */
+  requestKeys?: Record<number, string>;
   pending?: { state: string; requests: PendingRequest[] };
 }
 
@@ -65,6 +70,7 @@ const readStored = (storage: Storage, key: string): StoredFlow => {
       url: parsed.url,
       results: parsed.results ?? {},
       asyncSlots: parsed.asyncSlots,
+      requestKeys: parsed.requestKeys,
       pending: parsed.pending,
     };
   } catch {
@@ -112,6 +118,9 @@ export class UrlFlow {
   // Call-order slots whose producer was async, so a replay returns a promise
   // (see StoredFlow.asyncSlots).
   #asyncSlots: Set<number>;
+  // Content fingerprint per request slot, for the replay divergence guard
+  // (see StoredFlow.requestKeys).
+  #requestKeys: Record<number, string> = {};
   #buffer: { index: number; request: JsonRpcRequest }[] = [];
   #inFlight = 0;
   #flushTimer?: ReturnType<typeof setTimeout>;
@@ -153,6 +162,7 @@ export class UrlFlow {
       this.#url = stored.url ?? options.url;
       this.#results = { ...stored.results };
       this.#asyncSlots = new Set(stored.asyncSlots);
+      this.#requestKeys = { ...stored.requestKeys };
       const parsed = parseJson(message);
       const responses = Array.isArray(parsed) ? parsed : [parsed];
       for (const { index, id } of stored.pending.requests) {
@@ -186,12 +196,23 @@ export class UrlFlow {
   }
 
   /**
+   * The content fingerprint recorded for a request slot, or `undefined` if no
+   * request was journaled there. Used by the channel's replay divergence guard.
+   * @param index - The call-order slot to read.
+   */
+  recordedRequestKey(index: number): string | undefined {
+    return this.#requestKeys[index];
+  }
+
+  /**
    * Buffers an uncached request for the next redirect.
    * @param index - The call-order slot reserved for the request.
    * @param request - The JSON-RPC request to send on the next redirect.
+   * @param key - Content fingerprint recorded for the divergence guard.
    */
-  request(index: number, request: JsonRpcRequest): void {
+  request(index: number, request: JsonRpcRequest, key: string): void {
     this.#buffer.push({ index, request });
+    this.#requestKeys[index] = key;
     this.#scheduleFlush();
   }
 
@@ -210,6 +231,14 @@ export class UrlFlow {
     const index = this.next();
     const cached = this.get(index);
     if (cached !== undefined) {
+      // A recorded request key at this slot means a request owned it before the
+      // redirect; a memoize step landing here is a divergence, and the cached
+      // value is a response object, not this producer's value.
+      if (this.#requestKeys[index] !== undefined) {
+        throw new Error(
+          'URL transport replay diverged: a memoize step is at a slot that held a request before the redirect. Issue the same requests and memoize steps in the same order on every load.',
+        );
+      }
       // Replay: mirror the producer's original shape. An async slot resolves to
       // a promise (even though the journaled value is already resolved) so a
       // promise-returning memoize never hands back a bare value on the second
@@ -304,6 +333,7 @@ export class UrlFlow {
         url: this.#url,
         results: this.#results,
         asyncSlots: [...this.#asyncSlots],
+        requestKeys: this.#requestKeys,
         pending,
       }),
     );
