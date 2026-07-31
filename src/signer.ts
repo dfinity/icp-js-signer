@@ -53,13 +53,17 @@ const bytesEqual = (a: Uint8Array, b: Uint8Array): boolean =>
 
 // Untrusted expiration, decimal-string only: a nanosecond timestamp exceeds
 // Number.MAX_SAFE_INTEGER, so a numeric form is already precision-lost by
-// JSON.parse. Bound to 30 digits before BigInt() — decimal→bigint is super-linear,
-// so a multi-million-digit value would block the main thread for seconds.
+// JSON.parse. Bound to 20 digits (the width of u64 max) before the super-linear
+// decimal→BigInt parse, then reject anything above the u64 range it must fit.
 const toExpiration = (value: unknown): bigint => {
-  if (typeof value === 'string' && /^[0-9]{1,30}$/.test(value)) {
-    return BigInt(value);
+  if (typeof value !== 'string' || !/^[0-9]{1,20}$/.test(value)) {
+    throw new Error('Invalid delegation expiration');
   }
-  throw new Error('Invalid delegation expiration');
+  const expiration = BigInt(value);
+  if (expiration >= 2n ** 64n) {
+    throw new Error('Invalid delegation expiration');
+  }
+  return expiration;
 };
 
 // The chain must terminate at exactly the requested session key.

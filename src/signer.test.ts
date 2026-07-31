@@ -287,6 +287,17 @@ describe('Signer', () => {
         }).requestDelegation({ publicKey: session.getPublicKey() }),
       ).rejects.toThrow(/expiration/);
     });
+
+    it('rejects an expiration above the u64 range', async () => {
+      const session = Ed25519KeyIdentity.generate();
+      await expect(
+        signerFor({
+          root: Ed25519KeyIdentity.generate(),
+          leafDer: der(session),
+          expiration: (2n ** 64n).toString(), // 20 digits, passes the length bound
+        }).requestDelegation({ publicKey: session.getPublicKey() }),
+      ).rejects.toThrow(/expiration/);
+    });
   });
 
   describe('permissions', () => {
