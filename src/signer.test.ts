@@ -276,6 +276,17 @@ describe('Signer', () => {
         }).requestDelegation({ publicKey: session.getPublicKey() }),
       ).rejects.toThrow(/expiration/);
     });
+
+    it('rejects a numeric expiration (only the lossless string form is accepted)', async () => {
+      const session = Ed25519KeyIdentity.generate();
+      await expect(
+        signerFor({
+          root: Ed25519KeyIdentity.generate(),
+          leafDer: der(session),
+          expiration: ((Date.now() + 60_000) * 1_000_000) as unknown as string,
+        }).requestDelegation({ publicKey: session.getPublicKey() }),
+      ).rejects.toThrow(/expiration/);
+    });
   });
 
   describe('permissions', () => {
