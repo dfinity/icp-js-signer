@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Fix
+
+- **web**: re-validate the redirect URL at the sink and tighten secure-context (#35)
+- validate the delegation chain a signer returns against the request (#34)
+- **web**: apply origin/shape checks to every heartbeat status message (#33)
+- **agent**: bind a per-call nonce in SignerAgent content-map verification (#36)
+- **web**: guard the call-order replay journal with a content fingerprint (#37)
+
 ## 5.6.0 (2026-07-24)
 
 ### Feat
