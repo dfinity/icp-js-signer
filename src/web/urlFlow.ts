@@ -1,7 +1,9 @@
 import { type JsonRpcRequest, type JsonRpcResponse, isJsonRpcResponse } from '../transport.js';
 
-// Whether `hostname` is a loopback host per the secure-context definition:
-// `localhost`, `*.localhost`, the `127.0.0.0/8` range, or `[::1]`.
+// Whether `hostname` — always the already-parsed `url.hostname` — is a loopback
+// host: `localhost`, `*.localhost`, `[::1]`, or `127.0.0.0/8`. `new URL()` has
+// normalized IPv4 shorthand/hex/integer forms and thrown on out-of-range octets,
+// so the 127/8 test needs no octet check (never regex a raw host string here).
 const isLoopbackHost = (hostname: string): boolean =>
   hostname === 'localhost' ||
   hostname.endsWith('.localhost') ||
