@@ -48,6 +48,98 @@ const asString = (value: unknown): string | undefined =>
 const asArray = (value: unknown): unknown[] | undefined =>
   Array.isArray(value) ? value : undefined;
 
+const bytesEqual = (a: Uint8Array, b: Uint8Array): boolean =>
+  a.length === b.length && a.every((byte, index) => byte === b[index]);
+
+// Untrusted expiration, decimal-string only: a nanosecond timestamp exceeds
+// Number.MAX_SAFE_INTEGER, so a numeric form is already precision-lost by
+// JSON.parse. Bound to 20 digits (the width of u64 max) before the super-linear
+// decimal→BigInt parse, then reject anything above the u64 range it must fit.
+const toExpiration = (value: unknown): bigint => {
+  if (typeof value !== 'string' || !/^[0-9]{1,20}$/.test(value)) {
+    throw new Error('Invalid delegation expiration');
+  }
+  const expiration = BigInt(value);
+  if (expiration >= 2n ** 64n) {
+    throw new Error('Invalid delegation expiration');
+  }
+  return expiration;
+};
+
+// The chain must terminate at exactly the requested session key.
+const assertLeafKey = (delegations: DelegationChain['delegations'], publicKey: PublicKey): void => {
+  const leaf = delegations[delegations.length - 1]?.delegation.pubkey;
+  if (leaf !== undefined && bytesEqual(new Uint8Array(leaf), new Uint8Array(publicKey.toDer()))) {
+    return;
+  }
+  throw new Error('Returned delegation chain does not terminate at the requested public key');
+};
+
+// Target scope must be no broader than requested. The chain permits a canister
+// iff every hop permits it, so the effective scope is the intersection of the
+// scoped hops (an unscoped hop does not constrain); no scoped hop at all means
+// the chain is unrestricted — broader than a scoped request.
+const assertTargetScope = (
+  delegations: DelegationChain['delegations'],
+  targets: Principal[] | undefined,
+): void => {
+  if (targets === undefined) {
+    return;
+  }
+  const requested = new Set(targets.map(target => target.toText()));
+  const scopedHops = delegations
+    .map(({ delegation }) => delegation.targets)
+    .filter((hopTargets): hopTargets is Principal[] => hopTargets !== undefined);
+  if (scopedHops.length === 0) {
+    throw new Error('Returned delegation is unscoped but scoped targets were requested');
+  }
+  let effective: Set<string> | undefined;
+  for (const hop of scopedHops) {
+    const hopSet = new Set(hop.map(target => target.toText()));
+    effective =
+      effective === undefined
+        ? hopSet
+        : new Set([...effective].filter(target => hopSet.has(target)));
+  }
+  for (const target of effective ?? []) {
+    if (!requested.has(target)) {
+      throw new Error('Returned delegation targets are broader than requested');
+    }
+  }
+};
+
+// Lifetime must be no longer than requested, plus a skew margin for the signer's
+// clock and the request round-trip.
+const assertLifetime = (
+  delegations: DelegationChain['delegations'],
+  maxTimeToLive: bigint | undefined,
+): void => {
+  if (maxTimeToLive === undefined) {
+    return;
+  }
+  const skewNs = 5n * 60n * 1_000_000_000n;
+  const maxExpiration = BigInt(Date.now()) * 1_000_000n + maxTimeToLive + skewNs;
+  for (const { delegation } of delegations) {
+    if (delegation.expiration > maxExpiration) {
+      throw new Error('Returned delegation expires later than the requested maxTimeToLive');
+    }
+  }
+};
+
+// Validate a delegation chain returned by the (not fully trusted) signer against
+// what was requested. A terminal-key mismatch is fail-closed on-chain (bad
+// signatures are rejected), but target-scope and lifetime over-grants are NOT —
+// the IC enforces only what the chain contains, with no knowledge of the request
+// — so a broader-or-longer delegation than requested would be silently usable.
+const validateDelegationChain = (
+  chain: DelegationChain,
+  params: { publicKey: PublicKey; targets?: Principal[]; maxTimeToLive?: bigint },
+): void => {
+  assertLeafKey(chain.delegations, params.publicKey);
+  assertTargetScope(chain.delegations, params.targets);
+  assertLifetime(chain.delegations, params.maxTimeToLive);
+};
+
 /**
  * A function that transforms a JSON-RPC request before it is sent to the signer.
  * Transforms are applied in order and each receives the output of the previous one.
@@ -530,7 +622,7 @@ export class Signer<T extends Transport = Transport> {
         if (!publicKey || !signerDelegation) {
           throw new Error('Expected { publicKey, signerDelegation }');
         }
-        return DelegationChain.fromDelegations(
+        const chain = DelegationChain.fromDelegations(
           signerDelegation.map(item => {
             const obj = asRecord(item);
             const del = asRecord(obj?.delegation);
@@ -544,7 +636,7 @@ export class Signer<T extends Transport = Transport> {
             return {
               delegation: new Delegation(
                 fromBase64(pubkey),
-                BigInt(expiration as string | number),
+                toExpiration(expiration),
                 targets?.map(t => Principal.fromText(t as string)),
               ),
               signature: fromBase64(signature) as Signature,
@@ -552,6 +644,11 @@ export class Signer<T extends Transport = Transport> {
           }),
           fromBase64(publicKey),
         );
+        // Bind the returned chain to what was requested (session key, target
+        // scope, lifetime) so the signer can't hand back a broader or
+        // longer-lived delegation than the relying party asked for.
+        validateDelegationChain(chain, params);
+        return chain;
       },
     });
   }

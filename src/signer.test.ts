@@ -1,3 +1,4 @@
+import { Ed25519KeyIdentity } from '@icp-sdk/core/identity';
 import { Principal } from '@icp-sdk/core/principal';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Signer, SignerError, type SignerRequestTransformFn } from './signer.js';
@@ -170,6 +171,132 @@ describe('Signer', () => {
       const result = await signer.requestPermissions([{ method: 'icrc27_accounts' }]);
 
       expect(result).toEqual([{ scope: { method: 'icrc27_accounts' }, state: 'granted' }]);
+    });
+  });
+
+  describe('requestDelegation', () => {
+    const b64 = (bytes: Uint8Array): string => btoa(String.fromCharCode(...bytes));
+    const der = (identity: Ed25519KeyIdentity): Uint8Array =>
+      new Uint8Array(identity.getPublicKey().toDer());
+    const futureNs = (msFromNow: number): string => String((Date.now() + msFromNow) * 1_000_000);
+    const response = (opts: {
+      root: Ed25519KeyIdentity;
+      leafDer: Uint8Array;
+      expiration?: string;
+      targets?: string[];
+    }) => ({
+      publicKey: b64(der(opts.root)),
+      signerDelegation: [
+        {
+          delegation: {
+            pubkey: b64(opts.leafDer),
+            expiration: opts.expiration ?? futureNs(60_000),
+            ...(opts.targets !== undefined ? { targets: opts.targets } : {}),
+          },
+          signature: b64(new Uint8Array([1, 2, 3])),
+        },
+      ],
+    });
+    const signerFor = (opts: Parameters<typeof response>[0]): ReturnType<typeof createSigner> =>
+      createSigner(request => ({
+        jsonrpc: '2.0',
+        id: request.id as string,
+        result: response(opts),
+      }));
+
+    it('returns a chain that terminates at the requested key', async () => {
+      const session = Ed25519KeyIdentity.generate();
+      const root = Ed25519KeyIdentity.generate();
+      const chain = await signerFor({
+        root,
+        leafDer: der(session),
+      }).requestDelegation({ publicKey: session.getPublicKey() });
+      const leaf = chain.delegations[chain.delegations.length - 1].delegation.pubkey;
+      expect(new Uint8Array(leaf)).toEqual(der(session));
+    });
+
+    it('rejects a chain that does not terminate at the requested key', async () => {
+      const session = Ed25519KeyIdentity.generate();
+      await expect(
+        signerFor({
+          root: Ed25519KeyIdentity.generate(),
+          leafDer: der(Ed25519KeyIdentity.generate()),
+        }).requestDelegation({ publicKey: session.getPublicKey() }),
+      ).rejects.toThrow(/requested public key/);
+    });
+
+    it('rejects an unscoped delegation when scoped targets were requested', async () => {
+      const session = Ed25519KeyIdentity.generate();
+      await expect(
+        signerFor({
+          root: Ed25519KeyIdentity.generate(),
+          leafDer: der(session),
+        }).requestDelegation({
+          publicKey: session.getPublicKey(),
+          targets: [Principal.fromText('sgymv-uiaaa-aaaaa-aaaia-cai')],
+        }),
+      ).rejects.toThrow(/unscoped|broader/);
+    });
+
+    it('rejects targets broader than requested', async () => {
+      const session = Ed25519KeyIdentity.generate();
+      await expect(
+        signerFor({
+          root: Ed25519KeyIdentity.generate(),
+          leafDer: der(session),
+          targets: ['renrk-eyaaa-aaaaa-aaada-cai'],
+        }).requestDelegation({
+          publicKey: session.getPublicKey(),
+          targets: [Principal.fromText('sgymv-uiaaa-aaaaa-aaaia-cai')],
+        }),
+      ).rejects.toThrow(/broader/);
+    });
+
+    it('rejects a delegation that outlives the requested maxTimeToLive', async () => {
+      const session = Ed25519KeyIdentity.generate();
+      await expect(
+        signerFor({
+          root: Ed25519KeyIdentity.generate(),
+          leafDer: der(session),
+          expiration: futureNs(3_600_000),
+        }).requestDelegation({
+          publicKey: session.getPublicKey(),
+          maxTimeToLive: 60_000n * 1_000_000n,
+        }),
+      ).rejects.toThrow(/maxTimeToLive/);
+    });
+
+    it('rejects an out-of-bounds expiration string without parsing it', async () => {
+      const session = Ed25519KeyIdentity.generate();
+      await expect(
+        signerFor({
+          root: Ed25519KeyIdentity.generate(),
+          leafDer: der(session),
+          expiration: '1'.repeat(40),
+        }).requestDelegation({ publicKey: session.getPublicKey() }),
+      ).rejects.toThrow(/expiration/);
+    });
+
+    it('rejects a numeric expiration (only the lossless string form is accepted)', async () => {
+      const session = Ed25519KeyIdentity.generate();
+      await expect(
+        signerFor({
+          root: Ed25519KeyIdentity.generate(),
+          leafDer: der(session),
+          expiration: ((Date.now() + 60_000) * 1_000_000) as unknown as string,
+        }).requestDelegation({ publicKey: session.getPublicKey() }),
+      ).rejects.toThrow(/expiration/);
+    });
+
+    it('rejects an expiration above the u64 range', async () => {
+      const session = Ed25519KeyIdentity.generate();
+      await expect(
+        signerFor({
+          root: Ed25519KeyIdentity.generate(),
+          leafDer: der(session),
+          expiration: (2n ** 64n).toString(), // 20 digits, passes the length bound
+        }).requestDelegation({ publicKey: session.getPublicKey() }),
+      ).rejects.toThrow(/expiration/);
     });
   });
 
