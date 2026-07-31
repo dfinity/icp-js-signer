@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fix
+
+- **web**: guard the call-order replay journal with a content fingerprint (#37)
+
 ## 5.6.0 (2026-07-24)
 
 ### Feat
