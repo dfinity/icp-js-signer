@@ -109,7 +109,10 @@ const assertTargetScope = (
 };
 
 // Lifetime must be no longer than requested, plus a skew margin for the signer's
-// clock and the request round-trip.
+// clock and the request round-trip. The chain is usable only while every hop is
+// unexpired, so the effective lifetime is the earliest hop expiration; a hop that
+// expires later than that grants no additional time and does not over-extend the
+// delegation.
 const assertLifetime = (
   delegations: DelegationChain['delegations'],
   maxTimeToLive: bigint | undefined,
@@ -117,12 +120,17 @@ const assertLifetime = (
   if (maxTimeToLive === undefined) {
     return;
   }
+  const expirations = delegations.map(({ delegation }) => delegation.expiration);
+  if (expirations.length === 0) {
+    return;
+  }
+  const effective = expirations.reduce((earliest, expiration) =>
+    expiration < earliest ? expiration : earliest,
+  );
   const skewNs = 5n * 60n * 1_000_000_000n;
   const maxExpiration = BigInt(Date.now()) * 1_000_000n + maxTimeToLive + skewNs;
-  for (const { delegation } of delegations) {
-    if (delegation.expiration > maxExpiration) {
-      throw new Error('Returned delegation expires later than the requested maxTimeToLive');
-    }
+  if (effective > maxExpiration) {
+    throw new Error('Returned delegation expires later than the requested maxTimeToLive');
   }
 };
 

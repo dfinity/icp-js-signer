@@ -203,6 +203,23 @@ describe('Signer', () => {
         id: request.id as string,
         result: response(opts),
       }));
+    // Multi-hop chain, as produced by a signer that inserts an intermediate key:
+    // the last hop carries the requested session key.
+    const signerForChain = (opts: {
+      root: Ed25519KeyIdentity;
+      hops: { pubkeyDer: Uint8Array; expiration: string }[];
+    }): ReturnType<typeof createSigner> =>
+      createSigner(request => ({
+        jsonrpc: '2.0',
+        id: request.id as string,
+        result: {
+          publicKey: b64(der(opts.root)),
+          signerDelegation: opts.hops.map(hop => ({
+            delegation: { pubkey: b64(hop.pubkeyDer), expiration: hop.expiration },
+            signature: b64(new Uint8Array([1, 2, 3])),
+          })),
+        },
+      }));
 
     it('returns a chain that terminates at the requested key', async () => {
       const session = Ed25519KeyIdentity.generate();
@@ -259,6 +276,39 @@ describe('Signer', () => {
           root: Ed25519KeyIdentity.generate(),
           leafDer: der(session),
           expiration: futureNs(3_600_000),
+        }).requestDelegation({
+          publicKey: session.getPublicKey(),
+          maxTimeToLive: 60_000n * 1_000_000n,
+        }),
+      ).rejects.toThrow(/maxTimeToLive/);
+    });
+
+    it('accepts a chain whose later hop outlives maxTimeToLive when an earlier hop bounds it', async () => {
+      const session = Ed25519KeyIdentity.generate();
+      const intermediate = Ed25519KeyIdentity.generate();
+      const chain = await signerForChain({
+        root: Ed25519KeyIdentity.generate(),
+        hops: [
+          { pubkeyDer: der(intermediate), expiration: futureNs(60_000) },
+          { pubkeyDer: der(session), expiration: futureNs(30 * 24 * 3_600_000) },
+        ],
+      }).requestDelegation({
+        publicKey: session.getPublicKey(),
+        maxTimeToLive: 3_600_000n * 1_000_000n,
+      });
+      expect(chain.delegations).toHaveLength(2);
+    });
+
+    it('rejects a chain when every hop outlives the requested maxTimeToLive', async () => {
+      const session = Ed25519KeyIdentity.generate();
+      const intermediate = Ed25519KeyIdentity.generate();
+      await expect(
+        signerForChain({
+          root: Ed25519KeyIdentity.generate(),
+          hops: [
+            { pubkeyDer: der(intermediate), expiration: futureNs(2 * 3_600_000) },
+            { pubkeyDer: der(session), expiration: futureNs(30 * 24 * 3_600_000) },
+          ],
         }).requestDelegation({
           publicKey: session.getPublicKey(),
           maxTimeToLive: 60_000n * 1_000_000n,
