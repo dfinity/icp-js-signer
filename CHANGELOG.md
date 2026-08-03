@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fix
+
+- bound a delegation chain's lifetime by its earliest hop (#49)
+
 ## 5.6.1 (2026-07-31)
 
 ### Fix
