@@ -108,8 +108,6 @@ const assertTargetScope = (
   }
 };
 
-const min = (a: bigint, b: bigint): bigint => (a < b ? a : b);
-
 // Throws if the chain's lifetime exceeds the requested `maxTimeToLive`.
 //
 // The chain is usable only while every hop is unexpired, so its lifetime is the
@@ -124,7 +122,8 @@ const assertLifetime = (
     return;
   }
   const delegationChainExpiration = delegations.reduce(
-    (earliestExpiration, { delegation }) => min(earliestExpiration, delegation.expiration),
+    (earliestExpiration, { delegation }) =>
+      delegation.expiration < earliestExpiration ? delegation.expiration : earliestExpiration,
     first.delegation.expiration,
   );
   // Expirations are absolute nanoseconds, so the millisecond clock is scaled by
