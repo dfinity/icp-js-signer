@@ -108,28 +108,32 @@ const assertTargetScope = (
   }
 };
 
-// Lifetime must be no longer than requested, plus a skew margin for the signer's
-// clock and the request round-trip. The chain is usable only while every hop is
-// unexpired, so the effective lifetime is the earliest hop expiration; a hop that
-// expires later than that grants no additional time and does not over-extend the
-// delegation.
+const min = (a: bigint, b: bigint): bigint => (a < b ? a : b);
+
+// Throws if the chain's lifetime exceeds the requested `maxTimeToLive`.
+//
+// The chain is usable only while every hop is unexpired, so its lifetime is the
+// earliest hop expiration. A hop expiring later than that grants no additional
+// time and so does not over-extend the delegation.
 const assertLifetime = (
   delegations: DelegationChain['delegations'],
   maxTimeToLive: bigint | undefined,
 ): void => {
-  if (maxTimeToLive === undefined) {
+  const first = delegations[0];
+  if (maxTimeToLive === undefined || first === undefined) {
     return;
   }
-  const expirations = delegations.map(({ delegation }) => delegation.expiration);
-  if (expirations.length === 0) {
-    return;
-  }
-  const effective = expirations.reduce((earliest, expiration) =>
-    expiration < earliest ? expiration : earliest,
+  const delegationChainExpiration = delegations.reduce(
+    (earliestExpiration, { delegation }) => min(earliestExpiration, delegation.expiration),
+    first.delegation.expiration,
   );
+  // Expirations are absolute nanoseconds, so the millisecond clock is scaled by
+  // 1e6. The skew margin absorbs drift between our clock and the signer's plus
+  // the request round-trip, so a signer that honoured the request exactly is not
+  // rejected for answering a moment later than we asked.
   const skewNs = 5n * 60n * 1_000_000_000n;
   const maxExpiration = BigInt(Date.now()) * 1_000_000n + maxTimeToLive + skewNs;
-  if (effective > maxExpiration) {
+  if (delegationChainExpiration > maxExpiration) {
     throw new Error('Returned delegation expires later than the requested maxTimeToLive');
   }
 };
