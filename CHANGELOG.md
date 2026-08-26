@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fix
+
+- **web**: report a channel closed once its signer window has gone (#53)
+
 ## 5.6.2 (2026-08-03)
 
 ### Fix
