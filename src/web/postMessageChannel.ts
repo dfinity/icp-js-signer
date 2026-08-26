@@ -56,7 +56,7 @@ export class PostMessageChannel implements Channel {
 
   /** Whether this channel has been closed. */
   get closed() {
-    return this.#closed;
+    return this.#closed || this.#options.signerWindow.closed;
   }
 
   addEventListener(
@@ -97,7 +97,7 @@ export class PostMessageChannel implements Channel {
    * @param request - The JSON-RPC request to send.
    */
   send(request: JsonRpcRequest): Promise<void> {
-    if (this.#closed) {
+    if (this.closed) {
       return Promise.reject(new PostMessageTransportError('Communication channel is closed'));
     }
 

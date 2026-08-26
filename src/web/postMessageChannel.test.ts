@@ -8,6 +8,7 @@ const createMockSignerWindow = () => ({
   postMessage: vi.fn(),
   close: vi.fn(),
   focus: vi.fn(),
+  closed: false,
 });
 
 const createMockWindow = () => {
@@ -79,6 +80,16 @@ describe('PostMessageChannel', () => {
       );
     });
 
+    it('throws when the signer window has been closed', async () => {
+      const { channel, signerWindow } = createChannel();
+      signerWindow.closed = true;
+
+      await expect(channel.send({ jsonrpc: '2.0', id: 1, method: 'test' })).rejects.toThrow(
+        PostMessageTransportError,
+      );
+      expect(signerWindow.postMessage).not.toHaveBeenCalled();
+    });
+
     it('queues messages when status is pending', async () => {
       const { channel, signerWindow } = createChannel({
         signerStatus: 'pending',
@@ -136,6 +147,26 @@ describe('PostMessageChannel', () => {
       await channel.close();
 
       expect(signerWindow.close).toHaveBeenCalledTimes(1);
+    });
+
+    it('reports closed once the signer window has been closed', () => {
+      const { channel, signerWindow } = createChannel();
+      expect(channel.closed).toBe(false);
+
+      signerWindow.closed = true;
+
+      expect(channel.closed).toBe(true);
+    });
+
+    it('still notifies listeners for a signer window that has gone', async () => {
+      const { channel, signerWindow } = createChannel();
+      const closeListener = vi.fn();
+      channel.addEventListener('close', closeListener);
+      signerWindow.closed = true;
+
+      await channel.close();
+
+      expect(closeListener).toHaveBeenCalled();
     });
   });
 
