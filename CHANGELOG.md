@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Feat
+
+- require @icp-sdk/core v6 (#39)
+
 ## 5.6.3 (2026-08-26)
 
 ### Fix
