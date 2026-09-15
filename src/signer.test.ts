@@ -184,6 +184,7 @@ describe('Signer', () => {
       leafDer: Uint8Array;
       expiration?: string;
       targets?: string[];
+      permissions?: string;
     }) => ({
       publicKey: b64(der(opts.root)),
       signerDelegation: [
@@ -192,6 +193,7 @@ describe('Signer', () => {
             pubkey: b64(opts.leafDer),
             expiration: opts.expiration ?? futureNs(60_000),
             ...(opts.targets !== undefined ? { targets: opts.targets } : {}),
+            ...(opts.permissions !== undefined ? { permissions: opts.permissions } : {}),
           },
           signature: b64(new Uint8Array([1, 2, 3])),
         },
@@ -347,6 +349,27 @@ describe('Signer', () => {
           expiration: (2n ** 64n).toString(), // 20 digits, passes the length bound
         }).requestDelegation({ publicKey: session.getPublicKey() }),
       ).rejects.toThrow(/expiration/);
+    });
+
+    it('round-trips the delegation permissions scope', async () => {
+      const session = Ed25519KeyIdentity.generate();
+      const chain = await signerFor({
+        root: Ed25519KeyIdentity.generate(),
+        leafDer: der(session),
+        permissions: 'queries',
+      }).requestDelegation({ publicKey: session.getPublicKey() });
+
+      expect(chain.delegations[0].delegation.permissions).toBe('queries');
+    });
+
+    it('leaves permissions undefined when the signer omits them', async () => {
+      const session = Ed25519KeyIdentity.generate();
+      const chain = await signerFor({
+        root: Ed25519KeyIdentity.generate(),
+        leafDer: der(session),
+      }).requestDelegation({ publicKey: session.getPublicKey() });
+
+      expect(chain.delegations[0].delegation.permissions).toBeUndefined();
     });
   });
 

@@ -1,4 +1,4 @@
-import type { PublicKey, Signature } from '@icp-sdk/core/agent';
+import type { DerEncodedPublicKey, PublicKey, Signature } from '@icp-sdk/core/agent';
 import { Delegation, DelegationChain } from '@icp-sdk/core/identity';
 import { Principal } from '@icp-sdk/core/principal';
 import type {
@@ -644,16 +644,18 @@ export class Signer<T extends Transport = Transport> {
               throw new Error('Expected delegation { pubkey, expiration, signature }');
             }
             const targets = asArray(del?.targets);
+            const permissions = asString(del?.permissions);
             return {
               delegation: new Delegation(
                 fromBase64(pubkey),
                 toExpiration(expiration),
                 targets?.map(t => Principal.fromText(t as string)),
+                permissions,
               ),
               signature: fromBase64(signature) as Signature,
             };
           }),
-          fromBase64(publicKey),
+          fromBase64(publicKey) as DerEncodedPublicKey,
         );
         // Bind the returned chain to what was requested (session key, target
         // scope, lifetime) so the signer can't hand back a broader or
