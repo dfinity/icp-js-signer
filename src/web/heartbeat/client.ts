@@ -183,12 +183,16 @@ export class HeartbeatClient {
     handler: (event: MessageEvent<JsonRpcResponse & { result: 'pending' | 'ready' }>) => void,
   ): () => void {
     const listener = (event: MessageEvent) => {
+      // The source-window and JSON-RPC-shape checks must apply to EVERY accepted
+      // message: keep the `pending`/`ready` comparison inside the conjunction so
+      // `|| result === 'ready'` can't stand alone and admit a message from any
+      // window/origin. `isJsonRpcResponse` also confirms `event.data` is a
+      // non-null object before any property of it is read.
       if (
-        (event.source === this.#options.signerWindow &&
-          isJsonRpcResponse(event.data) &&
-          'result' in event.data &&
-          event.data.result === 'pending') ||
-        event.data.result === 'ready'
+        event.source === this.#options.signerWindow &&
+        isJsonRpcResponse(event.data) &&
+        'result' in event.data &&
+        (event.data.result === 'pending' || event.data.result === 'ready')
       ) {
         handler(event);
       }
