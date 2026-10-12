@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Feat
+
+- accept a promise of a request, kept in the slot of its call (#62)
+
 ## 6.0.0 (2026-09-15)
 
 ### Feat
