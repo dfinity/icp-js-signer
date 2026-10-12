@@ -55,6 +55,24 @@ describe('BrowserExtensionChannel', () => {
       expect(providerDetail.sendMessage).toHaveBeenCalledWith(request);
     });
 
+    it('hands a plain request to the extension within the call', () => {
+      const { channel, providerDetail } = createChannel();
+      const request = { jsonrpc: '2.0' as const, id: 1, method: 'test' };
+
+      void channel.send(request);
+
+      expect(providerDetail.sendMessage).toHaveBeenCalledWith(request);
+    });
+
+    it('sends a promised request once it resolves', async () => {
+      const { channel, providerDetail } = createChannel();
+      const request = { jsonrpc: '2.0' as const, id: 1, method: 'test' };
+
+      await channel.send(Promise.resolve(request));
+
+      expect(providerDetail.sendMessage).toHaveBeenCalledWith(request);
+    });
+
     it('dispatches JSON-RPC responses to listeners', async () => {
       const providerDetail = createMockProviderDetail({
         sendMessage: vi.fn(() =>

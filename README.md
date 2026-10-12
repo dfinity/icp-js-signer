@@ -83,6 +83,18 @@ const [attributes, delegation] = await Promise.all([
 finish(nonce, attributes, delegation); // runs once, on completion
 ```
 
+A request can also be sent before the value it depends on is ready: pass `sendRequest` a promise of the request. It keeps the call-order slot of its call, so requests issued together replay into the right slots even when their inputs arrive in a different order on the return load.
+
+```ts
+const nonce = transport.memoize(() => fetchNonce()); // not awaited
+const [attributes, delegation] = await Promise.all([
+  signer.sendRequest(
+    nonce.then(nonce => ({ jsonrpc: '2.0', id: 1, method: 'attributes', params: { nonce } })),
+  ),
+  signer.requestDelegation({ publicKey, targets }),
+]);
+```
+
 A signer can start a flow with no extra machinery: visiting a flow's route with no response present is already a fresh start, so a signer initiates simply by navigating the user to that route (a declared callback), and the flow runs as usual.
 
 ### Extension

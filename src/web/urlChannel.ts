@@ -61,9 +61,27 @@ export class UrlChannel implements Channel {
   /**
    * Resolves the request from the journal if the flow has already reached this
    * call, otherwise buffers it for the next redirect.
-   * @param request - The JSON-RPC request to send.
+   *
+   * The call-order slot is taken on the call, so a promise of a request keeps
+   * its place however long it takes to resolve: concurrent requests whose
+   * inputs arrive in a different order on the return load still replay into
+   * the slots they were sent from.
+   * @param request - The JSON-RPC request to send, or a promise of it.
    */
-  send(request: JsonRpcRequest): Promise<void> {
+  send(request: JsonRpcRequest | Promise<JsonRpcRequest>): Promise<void> {
+    if (this.#closed) {
+      return Promise.reject(new Error('Communication channel is closed'));
+    }
+
+    const index = this.#flow.next();
+    if (!(request instanceof Promise)) {
+      return this.#sendAt(index, request);
+    }
+    const release = this.#flow.hold();
+    return request.then(resolved => this.#sendAt(index, resolved)).finally(release);
+  }
+
+  #sendAt(index: number, request: JsonRpcRequest): Promise<void> {
     if (this.#closed) {
       return Promise.reject(new Error('Communication channel is closed'));
     }
@@ -77,7 +95,6 @@ export class UrlChannel implements Channel {
       );
     }
 
-    const index = this.#flow.next();
     const key = requestKey(request);
     const cached = this.#flow.get(index);
     if (cached !== undefined) {

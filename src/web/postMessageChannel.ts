@@ -94,9 +94,13 @@ export class PostMessageChannel implements Channel {
    * Sends a JSON-RPC request to the signer. If the signer status is
    * `"pending"`, the request is queued until {@link changeStatus} is
    * called with `"ready"`.
-   * @param request - The JSON-RPC request to send.
+   * @param request - The JSON-RPC request to send, or a promise of it.
    */
-  send(request: JsonRpcRequest): Promise<void> {
+  send(request: JsonRpcRequest | Promise<JsonRpcRequest>): Promise<void> {
+    if (request instanceof Promise) {
+      return request.then(resolved => this.send(resolved));
+    }
+
     if (this.closed) {
       return Promise.reject(new PostMessageTransportError('Communication channel is closed'));
     }

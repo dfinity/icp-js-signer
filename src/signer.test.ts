@@ -28,12 +28,12 @@ const createMockChannel = (respondWith: (request: JsonRpcRequest) => JsonRpcResp
       }
       return () => {};
     },
-    send(request: JsonRpcRequest): Promise<void> {
+    async send(request: JsonRpcRequest | Promise<JsonRpcRequest>): Promise<void> {
+      const resolved = await request;
       // Simulate async signer response
       queueMicrotask(() => {
-        responseListener?.(respondWith(request));
+        responseListener?.(respondWith(resolved));
       });
-      return Promise.resolve();
     },
     close(): Promise<void> {
       this.closed = true;
@@ -849,6 +849,68 @@ describe('Signer', () => {
       const standards = await signer.getSupportedStandards();
 
       expect(standards).toEqual([{ name: 'correct', url: '' }]);
+    });
+
+    it('opens the channel on the call while the request is still resolving', () => {
+      const establishChannel = vi.fn(() => new Promise<Channel>(() => {}));
+      const signer = new Signer({ transport: { establishChannel }, crypto: mockCrypto });
+
+      void signer.sendRequest(new Promise<JsonRpcRequest>(() => {}));
+
+      // Synchronously, so a window transport opens inside the user's click.
+      expect(establishChannel).toHaveBeenCalledOnce();
+    });
+
+    it('sends a promised request once it resolves', async () => {
+      const signer = createSigner(request => ({
+        jsonrpc: '2.0',
+        id: request.id ?? null,
+        result: { method: request.method },
+      }));
+
+      const response = await signer.sendRequest(
+        Promise.resolve<JsonRpcRequest>({ jsonrpc: '2.0', id: 'r', method: 'icrc_test' }),
+      );
+
+      expect(response).toEqual({ jsonrpc: '2.0', id: 'r', result: { method: 'icrc_test' } });
+    });
+
+    it("rejects with the caller's own error when the request rejects", async () => {
+      const signer = createSigner(() => {
+        throw new Error('no request was sent');
+      });
+      const cause = new Error('nonce unavailable');
+
+      await expect(signer.sendRequest(Promise.reject(cause))).rejects.toBe(cause);
+    });
+
+    it("rejects with the caller's error when the channel fails after the request rejected", async () => {
+      let failChannel!: (error: Error) => void;
+      const transport: Transport = {
+        establishChannel: () =>
+          new Promise<Channel>((_, reject) => {
+            failChannel = reject;
+          }),
+      };
+      const signer = new Signer({ transport, crypto: mockCrypto });
+      const unhandled = vi.fn();
+      process.on('unhandledRejection', unhandled);
+      const cause = new Error('nonce unavailable');
+      let rejectRequest!: (error: Error) => void;
+
+      const sent = signer.sendRequest(
+        new Promise<JsonRpcRequest>((_, reject) => {
+          rejectRequest = reject;
+        }),
+      );
+      rejectRequest(cause);
+      await new Promise(resolve => setTimeout(resolve, 0));
+      failChannel(new Error('handshake timed out'));
+
+      await expect(sent).rejects.toBe(cause);
+      await new Promise(resolve => setTimeout(resolve, 0));
+      process.off('unhandledRejection', unhandled);
+      expect(unhandled).not.toHaveBeenCalled();
     });
   });
 });

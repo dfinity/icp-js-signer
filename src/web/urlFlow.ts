@@ -241,6 +241,19 @@ export class UrlFlow {
   }
 
   /**
+   * Holds the redirect until the returned release is called, so a step whose
+   * result is still on its way is journaled or buffered before the page leaves.
+   */
+  hold(): () => void {
+    this.#inFlight++;
+    return () => {
+      this.#inFlight--;
+      // A buffered request may have been held off while this step ran.
+      this.#scheduleFlush();
+    };
+  }
+
+  /**
    * The core journaled step: runs `produce` once for its call-order slot and
    * records the result, or returns the recorded result on a replay load
    * without running `produce` again. This is what `UrlTransport.memoize`
@@ -278,13 +291,7 @@ export class UrlFlow {
       this.#persist();
       return value;
     };
-    const release = (): void => {
-      this.#inFlight--;
-      // A buffered request may have been held off while this producer ran.
-      this.#scheduleFlush();
-    };
-
-    this.#inFlight++;
+    const release = this.hold();
     let produced: T | Promise<T>;
     try {
       produced = produce();
@@ -316,8 +323,9 @@ export class UrlFlow {
 
   #flush(): void {
     this.#flushTimer = undefined;
-    // Hold the redirect until any in-flight memoize producer has recorded, so a
-    // concurrently produced value (e.g. a nonce) is journaled before we leave.
+    // Hold the redirect until every held step has landed — a memoize producer
+    // recorded, a request still resolving buffered — so a concurrently produced
+    // value (e.g. a nonce) is journaled and sent before we leave.
     if (this.#inFlight > 0 || this.#buffer.length === 0) {
       return;
     }
