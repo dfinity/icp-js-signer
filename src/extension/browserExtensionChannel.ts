@@ -81,9 +81,20 @@ export class BrowserExtensionChannel implements Channel {
    * @param request - The JSON-RPC request to send to the extension, or a promise of it.
    */
   async send(request: JsonRpcRequest | Promise<JsonRpcRequest>): Promise<void> {
-    const resolved = await request;
     if (this.#closed) {
       throw new BrowserExtensionTransportError('Communication channel is closed');
+    }
+
+    // Awaited only when it is a promise, so a plain request reaches the
+    // extension within this call.
+    let resolved: JsonRpcRequest;
+    if (request instanceof Promise) {
+      resolved = await request;
+      if (this.#closed) {
+        throw new BrowserExtensionTransportError('Communication channel is closed');
+      }
+    } else {
+      resolved = request;
     }
 
     const response = await this.#options.providerDetail.sendMessage(resolved);

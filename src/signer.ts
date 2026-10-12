@@ -373,7 +373,32 @@ export class Signer<T extends Transport = Transport> {
    * @param request - The JSON-RPC request to send, or a promise of it.
    */
   async sendRequest(request: JsonRpcRequest | Promise<JsonRpcRequest>): Promise<JsonRpcResponse> {
-    const channel = await this.openChannel();
+    const opening = this.openChannel();
+
+    // The caller's own rejection is the caller's error, passed on as it is
+    // rather than reported as a channel or network failure. Observed on the
+    // call, as establishing the channel can take until its handshake times out.
+    let rejectedByCaller: { error: unknown } | undefined;
+    const input =
+      request instanceof Promise
+        ? request.catch((error: unknown) => {
+            rejectedByCaller = { error };
+            throw error;
+          })
+        : request;
+    if (input instanceof Promise) {
+      void input.catch(() => undefined);
+    }
+
+    let channel: Channel;
+    try {
+      channel = await opening;
+    } catch (error) {
+      if (rejectedByCaller !== undefined) {
+        throw rejectedByCaller.error;
+      }
+      throw error;
+    }
 
     const { promise, resolve, reject } = Promise.withResolvers<JsonRpcResponse>();
 
@@ -483,18 +508,12 @@ export class Signer<T extends Transport = Transport> {
       return transformed;
     };
 
-    // The caller's own rejection is the caller's error, passed on as it is
-    // rather than reported as a network failure.
-    let rejectedByCaller: { error: unknown } | undefined;
     let outgoing: JsonRpcRequest | Promise<JsonRpcRequest>;
-    if (request instanceof Promise) {
-      outgoing = request.then(transform, (error: unknown) => {
-        rejectedByCaller = { error };
-        throw error;
-      });
+    if (input instanceof Promise) {
+      outgoing = input.then(transform);
     } else {
       try {
-        outgoing = transform(request);
+        outgoing = transform(input);
       } catch (error) {
         fail(error);
         return promise;

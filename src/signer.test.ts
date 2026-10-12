@@ -883,5 +883,34 @@ describe('Signer', () => {
 
       await expect(signer.sendRequest(Promise.reject(cause))).rejects.toBe(cause);
     });
+
+    it("rejects with the caller's error when the channel fails after the request rejected", async () => {
+      let failChannel!: (error: Error) => void;
+      const transport: Transport = {
+        establishChannel: () =>
+          new Promise<Channel>((_, reject) => {
+            failChannel = reject;
+          }),
+      };
+      const signer = new Signer({ transport, crypto: mockCrypto });
+      const unhandled = vi.fn();
+      process.on('unhandledRejection', unhandled);
+      const cause = new Error('nonce unavailable');
+      let rejectRequest!: (error: Error) => void;
+
+      const sent = signer.sendRequest(
+        new Promise<JsonRpcRequest>((_, reject) => {
+          rejectRequest = reject;
+        }),
+      );
+      rejectRequest(cause);
+      await new Promise(resolve => setTimeout(resolve, 0));
+      failChannel(new Error('handshake timed out'));
+
+      await expect(sent).rejects.toBe(cause);
+      await new Promise(resolve => setTimeout(resolve, 0));
+      process.off('unhandledRejection', unhandled);
+      expect(unhandled).not.toHaveBeenCalled();
+    });
   });
 });
