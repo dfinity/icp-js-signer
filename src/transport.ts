@@ -20,7 +20,12 @@ export interface Channel {
 
   addEventListener(event: 'response', listener: (response: JsonRpcResponse) => void): () => void;
 
-  send(request: JsonRpcRequest): Promise<void>;
+  /**
+   * Sends a request to the signer. A promise of a request is sent once it
+   * resolves, and keeps the place in call order it was given on the call.
+   * @param request - The JSON-RPC request to send, or a promise of it.
+   */
+  send(request: JsonRpcRequest | Promise<JsonRpcRequest>): Promise<void>;
 
   close(): Promise<void>;
 }

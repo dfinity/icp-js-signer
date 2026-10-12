@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { JsonRpcResponse } from '../transport.js';
+import { Signer } from '../signer.js';
+import type { JsonRpcRequest, JsonRpcResponse } from '../transport.js';
 import { UrlChannel } from './urlChannel.js';
 import { UrlTransport, UrlTransportError, type UrlTransportOptions } from './urlTransport.js';
 
@@ -207,6 +208,83 @@ describe('UrlTransport', () => {
         { ...attributes, id: 10 },
         { ...delegation, id: 11 },
       ]);
+    });
+  });
+
+  describe('promised requests across a redirect', () => {
+    // The shape of a sign-in that asks for attributes: the attributes request
+    // depends on a memoized nonce that is slow on the first load and replays
+    // at once on the return, while the delegation request is ready at once on
+    // both. Sent as promises, each keeps the slot of its call.
+    const run = (transport: UrlTransport, nonceDelay: Promise<void>) => {
+      const signer = new Signer({ transport, autoCloseTransportChannel: false });
+      const nonce = transport.memoize(async () => {
+        await nonceDelay;
+        return 'nonce-123';
+      });
+      const attributes = signer.sendRequest(
+        nonce.then((value): JsonRpcRequest => ({
+          jsonrpc: '2.0',
+          id: 'a',
+          method: 'icrc_attributes',
+          params: { nonce: value },
+        })),
+      );
+      const delegation = signer.sendRequest({
+        jsonrpc: '2.0',
+        id: 'd',
+        method: 'icrc34_delegation',
+      });
+      return Promise.all([attributes, delegation]);
+    };
+
+    it('replays into the slots they were called in when their inputs arrive in another order', async () => {
+      const storage = createStorage();
+
+      const location1 = createLocation();
+      const transport1 = new UrlTransport(options({ storage, location: location1 }));
+      let releaseNonce!: () => void;
+      void run(
+        transport1,
+        new Promise(resolve => {
+          releaseNonce = resolve;
+        }),
+      );
+      await tick();
+      await tick();
+      // The delegation is ready, but the redirect waits for the attributes.
+      expect(location1.assign).not.toHaveBeenCalled();
+      releaseNonce();
+      await tick();
+      await tick();
+      expect(location1.assign).toHaveBeenCalledOnce();
+
+      // Slot 0 is the nonce; the requests hold the slots of their calls.
+      const { requestKeys } = JSON.parse(storage.getItem(KEY) ?? '{}') as {
+        requestKeys: Record<number, string>;
+      };
+      expect(
+        Object.entries(requestKeys).map(([slot, key]) => [slot, JSON.parse(key).method]),
+      ).toEqual([
+        ['1', 'icrc_attributes'],
+        ['2', 'icrc34_delegation'],
+      ]);
+
+      const location2 = createLocation(
+        hashFor({
+          message: JSON.stringify([
+            response('d', { signerDelegation: ['chain'] }),
+            response('a', { attributes: ['verified'] }),
+          ]),
+          state: 'S',
+        }),
+      );
+      const transport2 = new UrlTransport(options({ storage, location: location2 }));
+      const [attributes, delegation] = await run(transport2, Promise.resolve());
+
+      expect(location2.assign).not.toHaveBeenCalled();
+      expect(attributes).toEqual(response('a', { attributes: ['verified'] }));
+      expect(delegation).toEqual(response('d', { signerDelegation: ['chain'] }));
     });
   });
 });

@@ -364,9 +364,15 @@ export class Signer<T extends Transport = Transport> {
 
   /**
    * Sends a JSON-RPC request over the transport channel.
-   * @param request - The JSON-RPC request to send.
+   *
+   * The request may be a promise: the channel opens on the call, and the
+   * request keeps the place in call order it was given there however long it
+   * takes to resolve. A caller can therefore issue concurrent requests in a
+   * fixed order before their inputs are ready, which is what the URL
+   * transport's replay relies on.
+   * @param request - The JSON-RPC request to send, or a promise of it.
    */
-  async sendRequest(request: JsonRpcRequest): Promise<JsonRpcResponse> {
+  async sendRequest(request: JsonRpcRequest | Promise<JsonRpcRequest>): Promise<JsonRpcResponse> {
     const channel = await this.openChannel();
 
     const { promise, resolve, reject } = Promise.withResolvers<JsonRpcResponse>();
@@ -374,9 +380,12 @@ export class Signer<T extends Transport = Transport> {
     // Notifications (no `id`) are send-and-forget per JSON-RPC and never
     // produce a response, so they don't keep the channel busy and aren't
     // tracked here. The promise still settles via the close-listener path
-    // when the channel eventually closes.
-    const expectsResponse = request.id !== undefined && request.id !== null;
-    if (expectsResponse) {
+    // when the channel eventually closes. A request still resolving is
+    // tracked until it turns out to be one.
+    const expectsResponse = (candidate: JsonRpcRequest): boolean =>
+      candidate.id !== undefined && candidate.id !== null;
+    const tracked = request instanceof Promise || expectsResponse(request);
+    if (tracked) {
       this.#pendingRequestCount++;
     }
     let settled = false;
@@ -385,13 +394,16 @@ export class Signer<T extends Transport = Transport> {
         return;
       }
       settled = true;
-      if (expectsResponse) {
+      if (tracked) {
         this.#pendingRequestCount--;
       }
     };
 
+    // Known once the request is; no response matches before then.
+    let id: JsonRpcRequest['id'];
+
     const removeResponseListener = channel.addEventListener('response', response => {
-      if (response.id !== request.id) {
+      if (response.id !== id) {
         return;
       }
 
@@ -444,40 +456,69 @@ export class Signer<T extends Transport = Transport> {
       );
     });
 
-    let transformedRequest: JsonRpcRequest;
-    try {
-      transformedRequest = this.#applyTransforms(request);
-    } catch (cause) {
+    const fail = (error: unknown) => {
       removeResponseListener();
       removeCloseListener();
       settle();
-      reject(
-        new SignerError(
+      reject(error);
+    };
+
+    const transform = (resolved: JsonRpcRequest): JsonRpcRequest => {
+      let transformed: JsonRpcRequest;
+      try {
+        transformed = this.#applyTransforms(resolved);
+      } catch (cause) {
+        throw new SignerError(
           {
             code: GENERIC_ERROR,
             message: `Transform failed: ${cause instanceof Error ? cause.message : cause}`,
           },
           { cause },
-        ),
-      );
-      return promise;
+        );
+      }
+      id = transformed.id;
+      if (!expectsResponse(transformed)) {
+        settle();
+      }
+      return transformed;
+    };
+
+    // The caller's own rejection is the caller's error, passed on as it is
+    // rather than reported as a network failure.
+    let rejectedByCaller: { error: unknown } | undefined;
+    let outgoing: JsonRpcRequest | Promise<JsonRpcRequest>;
+    if (request instanceof Promise) {
+      outgoing = request.then(transform, (error: unknown) => {
+        rejectedByCaller = { error };
+        throw error;
+      });
+    } else {
+      try {
+        outgoing = transform(request);
+      } catch (error) {
+        fail(error);
+        return promise;
+      }
     }
 
     try {
-      await channel.send(transformedRequest);
+      await channel.send(outgoing);
     } catch (error) {
-      removeResponseListener();
-      removeCloseListener();
-      settle();
-      reject(
-        new SignerError(
-          {
-            code: NETWORK_ERROR,
-            message: error instanceof Error ? error.message : 'Network error',
-          },
-          { cause: error },
-        ),
-      );
+      if (rejectedByCaller !== undefined) {
+        fail(rejectedByCaller.error);
+      } else if (error instanceof SignerError) {
+        fail(error);
+      } else {
+        fail(
+          new SignerError(
+            {
+              code: NETWORK_ERROR,
+              message: error instanceof Error ? error.message : 'Network error',
+            },
+            { cause: error },
+          ),
+        );
+      }
     }
 
     return promise;
