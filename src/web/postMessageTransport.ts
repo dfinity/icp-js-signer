@@ -23,7 +23,8 @@ export interface PostMessageTransportOptions {
    */
   window?: Window;
   /**
-   * Time in milliseconds to wait for the ICRC-29 heartbeat handshake to complete.
+   * Time in milliseconds to wait for an open signer window to complete the ICRC-29 handshake.
+   * A closed signer window fails establishment at the next status poll.
    * @default 120000
    */
   establishTimeout?: number;

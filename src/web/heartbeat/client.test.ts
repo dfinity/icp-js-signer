@@ -135,6 +135,48 @@ describe('HeartbeatClient', () => {
     expect(onEstablish).toHaveBeenCalledWith(ORIGIN, 'pending');
   });
 
+  it('fails establishment once the signer window closes without waiting for establishTimeout', async () => {
+    const relyingPartyWindow = createMockWindow();
+    const onEstablish = vi.fn();
+    const onEstablishTimeout = vi.fn();
+    const onDisconnect = vi.fn();
+    const signerWindow = {
+      closed: false,
+      postMessage: vi.fn(),
+    };
+
+    new HeartbeatClient({
+      signerWindow: signerWindow as any,
+      window: relyingPartyWindow as any,
+      crypto: mockCrypto,
+      onEstablish,
+      onEstablishTimeout,
+      onDisconnect,
+      onStatusChange: vi.fn(),
+      onPendingTimeout: vi.fn(),
+      statusPollingRate: 10,
+      establishTimeout: 5000,
+    });
+
+    signerWindow.closed = true;
+    await vi.advanceTimersByTimeAsync(30);
+
+    expect(onEstablishTimeout).toHaveBeenCalledTimes(1);
+    expect(onEstablish).not.toHaveBeenCalled();
+    expect(onDisconnect).not.toHaveBeenCalled();
+
+    relyingPartyWindow.dispatch({
+      type: 'message',
+      data: { jsonrpc: '2.0', id: 'hb-1', result: 'ready' },
+      origin: ORIGIN,
+      source: signerWindow,
+    });
+    await vi.advanceTimersByTimeAsync(10000);
+
+    expect(onEstablishTimeout).toHaveBeenCalledTimes(1);
+    expect(onEstablish).not.toHaveBeenCalled();
+  });
+
   const createAnsweringSignerWindow = (relyingPartyWindow: ReturnType<typeof createMockWindow>) => {
     const signerWindow = {
       closed: false,
