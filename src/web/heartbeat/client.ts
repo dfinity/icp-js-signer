@@ -10,12 +10,13 @@ export interface HeartbeatClientOptions {
    */
   onEstablish: (origin: string, status: 'pending' | 'ready') => void;
   /**
-   * Reasonable time in milliseconds in which the communication channel needs to be established
+   * Reasonable time in milliseconds in which an open signer window needs to answer.
+   * A closed signer window fails establishment at the next status poll.
    * @default 10000
    */
   establishTimeout?: number;
   /**
-   * Callback when no heartbeats have been received for `establishTimeout` milliseconds
+   * Callback when establishment fails because `establishTimeout` elapsed or the signer window closed
    */
   onEstablishTimeout: () => void;
   /**
@@ -32,7 +33,9 @@ export interface HeartbeatClientOptions {
    */
   onPendingTimeout: () => void;
   /**
-   * Time in milliseconds of not receiving heartbeat responses after which the communication channel is disconnected
+   * Time in milliseconds of not receiving heartbeat responses from a signer window that is still open
+   * after which the communication channel is disconnected. A closed signer window disconnects at the
+   * next status poll.
    * @default 5000
    */
   disconnectTimeout?: number;
@@ -85,6 +88,19 @@ export class HeartbeatClient {
       return id;
     };
 
+    const stop = () => {
+      clearTimeout(timeout);
+      clearInterval(interval);
+      listener();
+    };
+
+    // No channel exists until `onEstablish`, so a closed window rejects here
+    // rather than through `onDisconnect`.
+    const fail = () => {
+      stop();
+      this.#options.onEstablishTimeout();
+    };
+
     // Establish communication channel if a response is received for any pending id
     const listener = this.#receiveStatusResponse(response => {
       if (
@@ -93,9 +109,7 @@ export class HeartbeatClient {
         pending.includes(response.data.id)
       ) {
         pending = [];
-        listener();
-        clearInterval(interval);
-        clearTimeout(timeout);
+        stop();
 
         this.#status = response.data.result;
         this.#options.onEstablish(response.origin, response.data.result);
@@ -103,19 +117,16 @@ export class HeartbeatClient {
       }
     });
 
-    // Init timeout
-    const timeout = setTimeout(() => {
-      listener();
-      clearInterval(interval);
+    const timeout = setTimeout(fail, this.#options.establishTimeout);
 
-      this.#options.onEstablishTimeout();
-    }, this.#options.establishTimeout);
-
-    // Start sending requests
-    const interval = setInterval(
-      () => this.#sendStatusRequest(create()),
-      this.#options.statusPollingRate,
-    );
+    // A closed window will never answer, so don't wait out `establishTimeout` for it.
+    const interval = setInterval(() => {
+      if (this.#options.signerWindow.closed) {
+        fail();
+        return;
+      }
+      this.#sendStatusRequest(create());
+    }, this.#options.statusPollingRate);
   }
 
   #maintain(origin: string, status: 'pending' | 'ready'): void {
@@ -144,15 +155,19 @@ export class HeartbeatClient {
       return id;
     };
 
+    const disconnect = () => {
+      clearTimeout(timeout);
+      clearInterval(closedPoll);
+      listener();
+
+      this.#options.onDisconnect();
+    };
+
     // Clear existing timeout (if any) and create a new one
     const resetTimeout = (status: 'pending' | 'ready') => {
       clearTimeout(timeout);
       timeout = setTimeout(
-        () => {
-          listener();
-
-          this.#options.onDisconnect();
-        },
+        disconnect,
         status === 'pending' ? this.#options.pendingTimeout : this.#options.disconnectTimeout,
       );
     };
@@ -173,6 +188,14 @@ export class HeartbeatClient {
       }
       setTimeout(() => this.#sendStatusRequest(create()), this.#options.statusPollingRate);
     });
+
+    // A closed window will never answer, so don't wait out `disconnectTimeout` for it;
+    // that timeout is left to cover a window that is open but busy.
+    const closedPoll = setInterval(() => {
+      if (this.#options.signerWindow.closed) {
+        disconnect();
+      }
+    }, this.#options.statusPollingRate);
 
     // Init timeout and start sending requests
     resetTimeout(status);

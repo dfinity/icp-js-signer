@@ -134,4 +134,131 @@ describe('HeartbeatClient', () => {
 
     expect(onEstablish).toHaveBeenCalledWith(ORIGIN, 'pending');
   });
+
+  it('fails establishment once the signer window closes without waiting for establishTimeout', async () => {
+    const relyingPartyWindow = createMockWindow();
+    const onEstablish = vi.fn();
+    const onEstablishTimeout = vi.fn();
+    const onDisconnect = vi.fn();
+    const signerWindow = {
+      closed: false,
+      postMessage: vi.fn(),
+    };
+
+    new HeartbeatClient({
+      signerWindow: signerWindow as any,
+      window: relyingPartyWindow as any,
+      crypto: mockCrypto,
+      onEstablish,
+      onEstablishTimeout,
+      onDisconnect,
+      onStatusChange: vi.fn(),
+      onPendingTimeout: vi.fn(),
+      statusPollingRate: 10,
+      establishTimeout: 5000,
+    });
+
+    signerWindow.closed = true;
+    await vi.advanceTimersByTimeAsync(30);
+
+    expect(onEstablishTimeout).toHaveBeenCalledTimes(1);
+    expect(onEstablish).not.toHaveBeenCalled();
+    expect(onDisconnect).not.toHaveBeenCalled();
+
+    relyingPartyWindow.dispatch({
+      type: 'message',
+      data: { jsonrpc: '2.0', id: 'hb-1', result: 'ready' },
+      origin: ORIGIN,
+      source: signerWindow,
+    });
+    await vi.advanceTimersByTimeAsync(10000);
+
+    expect(onEstablishTimeout).toHaveBeenCalledTimes(1);
+    expect(onEstablish).not.toHaveBeenCalled();
+  });
+
+  const createAnsweringSignerWindow = (relyingPartyWindow: ReturnType<typeof createMockWindow>) => {
+    const signerWindow = {
+      closed: false,
+      answering: true,
+      postMessage: vi.fn((data: any) => {
+        if (data?.method === 'icrc29_status' && signerWindow.answering) {
+          queueMicrotask(() => {
+            relyingPartyWindow.dispatch({
+              type: 'message',
+              data: { jsonrpc: '2.0', id: data.id, result: 'ready' },
+              origin: ORIGIN,
+              source: signerWindow,
+            });
+          });
+        }
+      }),
+    };
+    return signerWindow;
+  };
+
+  it('disconnects once the signer window closes without waiting for disconnectTimeout', async () => {
+    const relyingPartyWindow = createMockWindow();
+    const signerWindow = createAnsweringSignerWindow(relyingPartyWindow);
+    const onDisconnect = vi.fn();
+
+    new HeartbeatClient({
+      signerWindow: signerWindow as any,
+      window: relyingPartyWindow as any,
+      crypto: mockCrypto,
+      onEstablish: vi.fn(),
+      onEstablishTimeout: vi.fn(),
+      onDisconnect,
+      onStatusChange: vi.fn(),
+      onPendingTimeout: vi.fn(),
+      statusPollingRate: 10,
+      establishTimeout: 1000,
+      disconnectTimeout: 5000,
+    });
+
+    await vi.advanceTimersByTimeAsync(50);
+    signerWindow.answering = false;
+    signerWindow.closed = true;
+    await vi.advanceTimersByTimeAsync(30);
+
+    expect(onDisconnect).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(10000);
+
+    expect(onDisconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the channel while an open signer window is slower to answer than the polling rate', async () => {
+    const relyingPartyWindow = createMockWindow();
+    const signerWindow = createAnsweringSignerWindow(relyingPartyWindow);
+    const onDisconnect = vi.fn();
+
+    new HeartbeatClient({
+      signerWindow: signerWindow as any,
+      window: relyingPartyWindow as any,
+      crypto: mockCrypto,
+      onEstablish: vi.fn(),
+      onEstablishTimeout: vi.fn(),
+      onDisconnect,
+      onStatusChange: vi.fn(),
+      onPendingTimeout: vi.fn(),
+      statusPollingRate: 10,
+      establishTimeout: 1000,
+      disconnectTimeout: 5000,
+    });
+
+    await vi.advanceTimersByTimeAsync(50);
+    signerWindow.answering = false;
+    await vi.advanceTimersByTimeAsync(3000);
+    signerWindow.answering = true;
+    relyingPartyWindow.dispatch({
+      type: 'message',
+      data: { jsonrpc: '2.0', id: `hb-${idCounter}`, result: 'ready' },
+      origin: ORIGIN,
+      source: signerWindow,
+    });
+    await vi.advanceTimersByTimeAsync(3000);
+
+    expect(onDisconnect).not.toHaveBeenCalled();
+  });
 });
