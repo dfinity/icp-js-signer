@@ -34,9 +34,10 @@ export interface PostMessageTransportOptions {
    */
   pendingTimeout?: number;
   /**
-   * Time in milliseconds without a heartbeat response after which
-   * the channel is considered disconnected.
-   * @default 2000
+   * Time in milliseconds without a heartbeat response from a signer window
+   * that is still open after which the channel is considered disconnected.
+   * A closed signer window disconnects at the next status poll.
+   * @default 10000
    */
   disconnectTimeout?: number;
   /**
@@ -121,7 +122,7 @@ export class PostMessageTransport implements Transport {
       window: globalThis.window,
       establishTimeout: 120000,
       pendingTimeout: 300000,
-      disconnectTimeout: 2000,
+      disconnectTimeout: 10000,
       statusPollingRate: 300,
       crypto: globalThis.crypto,
       manageFocus: true,

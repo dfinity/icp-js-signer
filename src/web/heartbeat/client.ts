@@ -32,7 +32,9 @@ export interface HeartbeatClientOptions {
    */
   onPendingTimeout: () => void;
   /**
-   * Time in milliseconds of not receiving heartbeat responses after which the communication channel is disconnected
+   * Time in milliseconds of not receiving heartbeat responses from a signer window that is still open
+   * after which the communication channel is disconnected. A closed signer window disconnects at the
+   * next status poll.
    * @default 5000
    */
   disconnectTimeout?: number;
@@ -144,15 +146,19 @@ export class HeartbeatClient {
       return id;
     };
 
+    const disconnect = () => {
+      clearTimeout(timeout);
+      clearInterval(closedPoll);
+      listener();
+
+      this.#options.onDisconnect();
+    };
+
     // Clear existing timeout (if any) and create a new one
     const resetTimeout = (status: 'pending' | 'ready') => {
       clearTimeout(timeout);
       timeout = setTimeout(
-        () => {
-          listener();
-
-          this.#options.onDisconnect();
-        },
+        disconnect,
         status === 'pending' ? this.#options.pendingTimeout : this.#options.disconnectTimeout,
       );
     };
@@ -173,6 +179,14 @@ export class HeartbeatClient {
       }
       setTimeout(() => this.#sendStatusRequest(create()), this.#options.statusPollingRate);
     });
+
+    // A closed window will never answer, so don't wait out `disconnectTimeout` for it;
+    // that timeout is left to cover a window that is open but busy.
+    const closedPoll = setInterval(() => {
+      if (this.#options.signerWindow.closed) {
+        disconnect();
+      }
+    }, this.#options.statusPollingRate);
 
     // Init timeout and start sending requests
     resetTimeout(status);
