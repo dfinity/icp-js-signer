@@ -158,6 +158,7 @@ describe('HeartbeatClient', () => {
       establishTimeout: 5000,
     });
 
+    await vi.advanceTimersByTimeAsync(10);
     signerWindow.closed = true;
     await vi.advanceTimersByTimeAsync(30);
 
