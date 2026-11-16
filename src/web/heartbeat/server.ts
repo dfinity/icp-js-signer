@@ -46,7 +46,7 @@ export class HeartbeatServer {
     this.#options = {
       status: 'ready',
       establishTimeout: 10000,
-      disconnectTimeout: 2000,
+      disconnectTimeout: 10000,
       window: globalThis.window,
       ...options,
       allowedOrigin: options.allowedOrigin ?? null,
