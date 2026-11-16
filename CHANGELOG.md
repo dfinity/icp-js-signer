@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fix
+
+- **web**: disconnect a closed signer window at once and give an open one 10s (#69)
+
 ## 6.1.0 (2026-10-12)
 
 ### Feat
