@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 6.1.1 (2026-11-16)
 
 ### Fix
 
